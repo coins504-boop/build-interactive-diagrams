@@ -1,37 +1,72 @@
-/* C presentation for official mxGraph cells. Metadata and topology are untouched; native card sizes follow their labels. */
+/* Architectural C presentation. Only native geometry/styles and labels change; all execution metadata is canonical. */
 (function(global){'use strict';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let areas=Object.create(null);
-const palette=[['#eaf1ff','#f5f8ff','#b6c7e5'],['#eeeafa','#faf8ff','#c6bce5'],['#e6f2eb','#f5faf6','#b4d2bf'],['#fff0da','#fffbf3','#dfcba8']];
+const palette=[['#152637','#101e2d','#4d7895'],['#211e32','#181725','#7f709f'],['#142b27','#10211f','#518c7d'],['#30291c','#231e16','#ac9058']];
 function configure(spec){areas=Object.create(null);spec.nodes.filter(n=>n.role==='container'&&!n.parent).forEach((n,i)=>{const colors=palette[i%palette.length];areas[n.id]={name:n.label,number:String(i+1).padStart(2,'0'),fill:colors[0],body:colors[1],stroke:colors[2]};});}
+const roleNames={container:'内部流程',source:'输入',step:'执行步骤',router:'条件判断',wait:'等待决定',terminal:'结束',store:'数据'};
+const iconPaths={container:'M4 7h16v13H4z M8 3h8v4 M8 11h8 M8 15h8',source:'M4 5h10v14H4z M10 12h11 M17 8l4 4-4 4',step:'M5 4h14v16H5z M9 8h6 M9 12h6 M9 16h4',router:'M12 3l9 9-9 9-9-9z M12 8v5 M12 16h0',wait:'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18 M12 7v6l4 2',terminal:'M4 4h16v16H4z M8 12l3 3 6-7',store:'M4 6c0-4 16-4 16 0s-16 4-16 0v12c0 4 16 4 16 0V6 M4 12c0 4 16 4 16 0'};
+function icon(role){return '<span class="c-role-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="'+(iconPaths[role]||iconPaths.step)+'"/></svg></span>';}
 
-function info(cell){if(!cell||!cell.value||!cell.value.getAttribute)return null;const v=cell.value;return{label:v.getAttribute('label')||'',role:v.getAttribute('role'),contract:JSON.parse(v.getAttribute('contract')||'{}'),generated:JSON.parse(v.getAttribute('generated')||'{}')};}
+function info(cell){if(!cell||!cell.value||!cell.value.getAttribute)return null;const v=cell.value;return{label:v.getAttribute('label')||'',role:v.getAttribute('role'),generated:JSON.parse(v.getAttribute('generated')||'{}')};}
 function areaFor(graph,cell){let c=cell;while(c&&c.id!=='1'){if(areas[c.id])return areas[c.id];c=graph.model.getParent(c);}return null;}
 function nativeStyle(model,cell,values){const named=[],style={};for(const part of (model.getStyle(cell)||'').split(';')){if(!part)continue;const i=part.indexOf('=');if(i<0)named.push(part);else style[part.slice(0,i)]=part.slice(i+1);}Object.assign(style,values);model.setStyle(cell,[...named,...Object.entries(style).map(([key,value])=>key+'='+value)].join(';')+';');}
-function label(graph,cell){const n=info(cell);if(!n)return'';if(cell.edge)return n.label.replace(/ \/ /g,' /\n');if(n.role==='router')return n.label;const area=areaFor(graph,cell),compound=n.role==='container',top=!!areas[cell.id],parts=(n.generated.composition||[]).length;let kind=compound?(top?'一级区域':(area?area.name+'工具':'工具')):n.role==='source'?'流程入口':n.role==='terminal'?'结束状态':n.role==='store'?'数据节点':'最小步骤';
- if(top)return'<div class="c-native-area"><span class="c-area-number">'+areas[cell.id].number+'</span><strong>'+esc(n.label.replace(/\n/g,' '))+'</strong><span class="c-area-count">'+parts+' 个工具与分支</span></div>';
- return'<div class="c-native-card"><div class="c-native-meta"><span>'+esc(kind)+'</span>'+(compound?'<span>'+parts+' 个内部步骤</span>':'')+'</div><div class="c-native-title">'+esc(n.label.replace(/\n/g,' '))+'</div></div>';
+function label(graph,cell){const n=info(cell);if(!n)return'';if(cell.edge)return n.label.replace(/ \/ /g,' /\n');if(n.role==='router')return n.label;const area=areaFor(graph,cell),compound=n.role==='container',top=!!areas[cell.id],parts=(n.generated.composition||[]).length;
+ if(top&&!graph.isCellCollapsed(cell))return'<div class="c-native-area"><span class="c-area-number">'+areas[cell.id].number+'</span><strong>'+esc(n.label.replace(/\n/g,' '))+'</strong><span class="c-area-count">'+parts+' 项</span></div>';
+ return'<div class="c-native-card" aria-label="'+esc((area?area.name+' / ':'')+n.label)+'">'+icon(n.role)+'<div class="c-card-copy"><div class="c-native-meta"><span>'+esc(roleNames[n.role]||n.role)+'</span>'+(compound?'<span>'+parts+' 项 ↗</span>':'')+'</div><div class="c-native-title">'+esc(n.label.replace(/\n/g,' '))+'</div></div></div>';
 }
-// Native text measurement sets card bounds; positions remain the native layout's job.
+// Card geometry includes the same icon gutter and title width as the CSS label.
 function cardSize(graph,cell){
  const n=info(cell),title=n.label.replace(/\n/g,' '),font='Noto Sans CJK SC';
- const measured=mxUtils.getSizeForString(esc(title),20,font,null,1);
- if(n.role==='router')return{width:Math.max(154,Math.min(224,Math.ceil(measured.width)+70)),height:88};
- const width=Math.max(156,Math.min(228,Math.ceil(measured.width)+24));
- const wrapped=mxUtils.getSizeForString(esc(title),20,font,width-24,1);
- return{width,height:Math.max(62,Math.ceil(wrapped.height*1.15)+32)};
+ const measured=mxUtils.getSizeForString(esc(title),17,font,null,1);
+ if(n.role==='router')return{width:Math.max(160,Math.min(214,Math.ceil(measured.width)+62)),height:92};
+ const width=Math.max(202,Math.min(252,Math.ceil(measured.width)+68));
+ const wrapped=mxUtils.getSizeForString(esc(title),17,font,width-68,1);
+ return{width,height:Math.max(76,Math.ceil(wrapped.height*1.25)+36)};
 }
 function fitCards(graph,cells){const model=graph.model;model.beginUpdate();try{for(const cell of cells||Object.values(model.cells)){if(!cell.vertex||!info(cell))continue;const n=info(cell),geometry=model.getGeometry(cell);if(!geometry)continue;const size=cardSize(graph,cell),geo=geometry.clone();if(n.role==='container'&&!graph.isCellCollapsed(cell)){if(geo.alternateBounds){geo.alternateBounds=geo.alternateBounds.clone();geo.alternateBounds.width=size.width;geo.alternateBounds.height=size.height;}}else{geo.width=size.width;geo.height=size.height;}model.setGeometry(cell,geo);}}finally{model.endUpdate();}}
 // The engine must see actual nested terminals as their immediate visible tool.
 function configureHierarchy(layout,parent){const m=layout.graph.model;const visible=cell=>{let c=cell;while(c&&m.getParent(c)!==parent)c=m.getParent(c);return c&&c.vertex?c:null;};const links=Object.values(m.cells).filter(e=>e.edge&&m.getParent(e)===parent).map(edge=>({edge,source:visible(m.getTerminal(edge,true)),target:visible(m.getTerminal(edge,false))})).filter(x=>x.source&&x.target&&x.source!==x.target);const map=new Map(links.map(x=>[x.edge.id,x]));const horizontal=layout.orientation===mxConstants.DIRECTION_WEST;m.beginUpdate();try{for(const {edge} of links)nativeStyle(m,edge,{exitX:horizontal?'1':'0.5',exitY:horizontal?'0.5':'1',entryX:horizontal?'0':'0.5',entryY:horizontal?'0.5':'0',entryPerimeter:'1',exitPerimeter:'1'});}finally{m.endUpdate();}layout.getEdges=cell=>links.filter(x=>x.source===cell||x.target===cell).map(x=>x.edge);layout.getVisibleTerminal=(edge,source)=>{const x=map.get(edge.id);return x?(source?x.source:x.target):null;};}
-function apply(graph){const model=graph.model;model.beginUpdate();try{for(const cell of Object.values(model.cells)){const n=info(cell);if(!n)continue;if(cell.vertex){const area=areaFor(graph,cell),top=!!areas[cell.id],compound=n.role==='container';let fill=area?area.fill:'#edf3ff',stroke=area?area.stroke:'#b9c5df';if(n.role==='source'||n.role==='terminal'){fill='#e8f3ec';stroke='#a8cdb8';}if(n.role==='router'||n.role==='wait'){fill='#fff2c9';stroke='#d9c486';}if(n.role==='store'){fill='#efeafa';stroke='#c8b9e1';}
- const style={html:n.role==='router'?'0':'1',fillColor:fill,strokeColor:stroke,fontColor:'#30344d',fontFamily:'Noto Sans CJK SC',fontSize:top?'22':'20',strokeWidth:'1.4',rounded:'1',arcSize:top?'10':'16',shadow:top||n.role==='router'?'0':'1',spacing:n.role==='router'?'10':'0',spacingLeft:'0',align:'center',verticalAlign:'middle',whiteSpace:'wrap'};
- if(compound){style.swimlaneFillColor=top?area.body:'#ffffff';style.startSize=top?'50':'46';style.fontStyle='0';style.align='left';}nativeStyle(model,cell,style);
- }else if(cell.edge){const kind=cell.value.getAttribute('kind'),colors={normal:'#929bb4',failure:'#bb8b63',wait:'#c6a344',resume:'#79a48e',reject:'#bd8495',data:'#ac95c5'};nativeStyle(model,cell,{html:'0',strokeColor:colors[kind]||colors.normal,fontColor:'#596179',labelBackgroundColor:'#ffffff',fontFamily:'Noto Sans CJK SC',fontSize:'15',strokeWidth:kind==='data'?'1.5':'1.6',rounded:'1',arcSize:'12'});}}
+// Native highlight geometry is reused for both the restrained halo and hot core.
+// No timer, motion, graph/model writes, synthetic edge or execution state is added.
+let lightSequence=0;
+function lightHighlight(highlight,kind){
+ const shape=highlight&&highlight.shape;if(!shape||!shape.node||!['active','node'].includes(kind))return;
+ shape._probeLightKind=kind;
+ if(!shape._probeLightRedraw){const redraw=shape.redraw;shape._probeLightRedraw=redraw;shape.redraw=function(...args){const result=redraw.apply(this,args);paintLight(this);return result;};}
+ paintLight(shape);
+}
+function paintLight(shape){
+ const node=shape.node,doc=node&&node.ownerDocument;if(!doc||!node.querySelectorAll)return;
+ for(const old of node.querySelectorAll('[data-probe-light]'))old.remove();
+ const paths=[...node.querySelectorAll('path,rect,ellipse,polygon,polyline')].filter(p=>{
+  const stroke=(p.getAttribute('stroke')||'').toLowerCase();
+  return stroke&&stroke!=='none'&&stroke!=='transparent'&&p.getAttribute('opacity')!=='0'&&p.getAttribute('stroke-opacity')!=='0';
+ });
+ if(!paths.length)return;
+ let scale=1;try{const matrix=node.getScreenCTM();if(matrix)scale=Math.max(.01,Math.hypot(matrix.a,matrix.b),Math.hypot(matrix.c,matrix.d));}catch(_){}
+ // getScreenCTM accounts for native CSS transforms. The maximum halo extent is
+ // 3.4 CSS pixels at any graph zoom, so parallel route channels remain distinct.
+ let box;try{box=node.getBBox();}catch(_){return;}if(!box||![box.x,box.y,box.width,box.height].every(Number.isFinite))return;
+ const svg=(name,attrs)=>{const e=doc.createElementNS('http://www.w3.org/2000/svg',name);for(const [k,v]of Object.entries(attrs||{}))e.setAttribute(k,String(v));return e;};
+ const id=shape._probeLightId||(shape._probeLightId='probe-light-'+(++lightSequence)),pad=3.4/scale;
+ const defs=svg('defs',{'data-probe-light':'defs'}),filter=svg('filter',{id,filterUnits:'userSpaceOnUse',x:box.x-pad,y:box.y-pad,width:Math.max(.01,box.width)+pad*2,height:Math.max(.01,box.height)+pad*2,'color-interpolation-filters':'sRGB'});
+ filter.appendChild(svg('feDropShadow',{dx:0,dy:0,stdDeviation:1.05/scale,'flood-color':'#52e9ff','flood-opacity':'.62'}));defs.appendChild(filter);node.insertBefore(defs,node.firstChild);
+ const width=shape._probeLightKind==='node'?2.5:2.25;
+ for(const path of paths){
+  path.setAttribute('vector-effect','non-scaling-stroke');path.style.strokeWidth=width+'px';path.setAttribute('filter','url(#'+id+')');
+  const core=path.cloneNode(false);core.removeAttribute('id');core.removeAttribute('filter');core.setAttribute('data-probe-light','core');core.setAttribute('class','probe-light-core');core.setAttribute('fill','none');core.setAttribute('stroke','#efffff');core.setAttribute('stroke-width',shape._probeLightKind==='node'?'1.1':'1');core.setAttribute('vector-effect','non-scaling-stroke');core.setAttribute('pointer-events','none');core.style.strokeWidth=(shape._probeLightKind==='node'?1.1:1)+'px';core.style.filter='none';path.parentNode.appendChild(core);
+ }
+}
+
+function apply(graph){if(graph.setAdaptiveColors)graph.setAdaptiveColors('none');const model=graph.model;model.beginUpdate();try{for(const cell of Object.values(model.cells)){const n=info(cell);if(!n)continue;if(cell.vertex){const area=areaFor(graph,cell),top=!!areas[cell.id],compound=n.role==='container';let fill=area?area.fill:'#162332',stroke=area?area.stroke:'#57748c';if(n.role==='source'||n.role==='terminal'){fill='#162a25';stroke='#568e7b';}if(n.role==='router'||n.role==='wait'){fill='#2b271c';stroke='#a38b53';}if(n.role==='store'){fill='#251f33';stroke='#83709e';}
+ const style={html:n.role==='router'?'0':'1',fillColor:fill,strokeColor:stroke,fontColor:'#e0e8f0',fontFamily:'Noto Sans CJK SC',fontSize:top?'19':'17',strokeWidth:top?'1.5':'1.2',rounded:'1',arcSize:top?'9':'12',shadow:'0',spacing:n.role==='router'?'12':'0',spacingLeft:'0',align:'center',verticalAlign:'middle',whiteSpace:'wrap'};
+ if(compound){style.swimlaneFillColor=top?area.body:'#111c28';style.startSize=top?'54':'46';style.fontStyle='0';style.align='left';}nativeStyle(model,cell,style);
+ }else if(cell.edge){const kind=cell.value.getAttribute('kind'),colors={normal:'#8295a9',failure:'#bd9273',wait:'#b99d60',resume:'#68a38b',reject:'#af8092',data:'#7e739d'};nativeStyle(model,cell,{html:'0',strokeColor:colors[kind]||colors.normal,fontColor:'#c3cdd7',labelBackgroundColor:'#0c1520',labelBorderColor:'none',fontFamily:'Noto Sans CJK SC',fontSize:'13',strokeWidth:kind==='data'?'1.2':'1.5',opacity:kind==='data'?'65':'100',dashed:['data','failure','wait','reject'].includes(kind)?'1':'0',dashPattern:kind==='data'?'2 5':'6 4',endArrow:'blockThin',endSize:'7',rounded:'1',arcSize:'12'});}}
  }finally{model.endUpdate();}
  graph.convertValueToString=cell=>label(graph,cell);graph.isHtmlLabel=cell=>!!cell.vertex&&info(cell)&&info(cell).role!=='router';
  // A folded native swimlane uses the whole card for its title and tool count.
  if(!graph._cStyleBase){graph._cStyleBase=graph.getCellStyle;graph.getCellStyle=function(cell,...args){const style=this._cStyleBase.call(this,cell,...args),n=info(cell);if(n&&n.role==='container'&&this.isCellCollapsed(cell)){const geo=this.model.getGeometry(cell);return{...style,startSize:geo?geo.height:76};}return style;};}
 }
-global.ProbeVisualTheme={configure,apply,nativeStyle,fitCards,cardSize,configureHierarchy};
+global.ProbeVisualTheme={configure,apply,nativeStyle,fitCards,cardSize,configureHierarchy,lightHighlight};
 })(typeof window!=='undefined'?window:globalThis);

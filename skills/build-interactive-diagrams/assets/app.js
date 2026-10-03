@@ -5,6 +5,7 @@ let spec,graph,sim,adapter,selected,containers=[],layoutBusy=false,manualLayout=
 let currentHighlight,edgeHighlight,focusId=null,viewTrail=[];
 let detail=null,detailSession=null,detailScope=null,detailLiveKey=null,detailManualScope=null,detailManualOwner=null,detailError=null;
 let autoRunning=false,autoGeneration=0,timer=null,runError=null;
+let presentation=null;
 const routeHighlights=new Map(),areaHighlights=new Map();
 const metadata=cell=>cell&&cell.value&&cell.value.getAttribute?{id:cell.id,label:cell.value.getAttribute('label')||cell.id,role:cell.value.getAttribute('role'),contract:JSON.parse(cell.value.getAttribute('contract')||'{}'),generated:JSON.parse(cell.value.getAttribute('generated')||'{}')}:null;
 const label=id=>adapter.node(id).label.replace(/\n/g,' ');
@@ -25,9 +26,19 @@ function updateScenario(){const s=spec.scenarios.find(x=>x.id===$('scenario').va
 function render(){if(!sim||!graph)return;const r=sim.run;for(const id of ['fit','relayout','zoom-in','zoom-out','focus','fold-selected','back-view'])$(id).disabled=!!detailSession;renderFoldButton();$('back-view').disabled=!!detailSession||!viewTrail.length;text('view-path',viewTrail.length?viewTrail.map(x=>label(x.id)).join(' › '):'总览');text('zoom-label',Math.round(graph.view.scale*100)+'%');$('run-panel').hidden=!r;$('stop-run').disabled=!r||r.terminal;text('run-id',r?r.id:'未开始');$('runtime-error').hidden=!runError;
  text('library-counts',spec.nodes.length+' 个节点 · '+spec.edges.length+' 条真实边\n仅本页模拟；刷新恢复输入规格');
  if(r){text('status',runError?'已暂停':autoRunning?'自动运行中':r.status);text('location',label(r.nodeId));text('why',r.reason);text('awaiting',r.terminal?'本次已结束，视角保持不变':sim.isWaiting()?'等待明确批准或拒绝':autoRunning?'沿真实边逐步推进':'已暂停，可单步或继续');text('source-label',r.mode+' · '+r.scenarioId);text('play',autoRunning?'暂停':'继续运行');$('play').disabled=r.terminal||sim.isWaiting();$('step').disabled=r.terminal||sim.isWaiting();$('back').disabled=!sim.history.length;$('waiting').hidden=!sim.isWaiting();text('waiting-text',adapter.node(r.nodeId).contract.goal);$('result').hidden=!r.terminal;text('result','结束状态：'+r.status+' · '+r.trace.length+' 个可见步骤');$('data-fields').replaceChildren(fieldsList(Object.entries(r.context)));$('outgoing').replaceChildren();for(const e of sim.outgoing()){const li=document.createElement('li');li.className=e.matches?'match':'';li.textContent=(e.matches?'✓ ':e.matches===null?'默认：':'○ ')+(e.label||e.id)+' → '+label(e.target)+'\n'+(e.when?JSON.stringify(e.when):'其他条件均不匹配时使用');$('outgoing').append(li);}text('trace-count','('+r.trace.length+')');$('trace').replaceChildren();for(const event of r.trace){const li=document.createElement('li');li.textContent=event.label;const small=document.createElement('small');small.textContent=event.edgeId?event.edgeId+' · '+event.reason:'入口';li.append(small);$('trace').append(li);}
- $('execution-badge').hidden=false;text('execution-badge','第 '+r.trace.length+' 步 · '+label(r.nodeId)+'\n'+(r.terminal?'已结束：'+r.status:sim.isWaiting()?'等待决定':autoRunning?'自动推进中':'已暂停'));$('completion-banner').hidden=!r.terminal||r.status==='cancelled';text('completion-title','本次已结束 · '+r.status);text('completion-detail',r.trace.length+' 步已保留；不会跳转或缩放您的当前视图');
- }else{$('execution-badge').hidden=true;$('completion-banner').hidden=true;}
- highlight();applyFocusAppearance();syncDetail();
+ renderNarrative(r);$('completion-banner').hidden=!r.terminal||r.status==='cancelled';text('completion-title','本次已结束 · '+r.status);text('completion-detail',r.trace.length+' 步已保留；不会跳转或缩放您的当前视图');
+ }else{$('execution-badge').hidden=false;$('execution-badge').dataset.status='idle';text('narrative-step','OVERVIEW');text('narrative-scope','结构总览');text('narrative-state','未开始');text('narrative-title','选择场景，沿真实路径逐步讲解');text('narrative-reason','主图看区域和步骤，角落跟随局部，点击深入细节');$('completion-banner').hidden=true;}
+ highlight();applyFocusAppearance();syncDetail();if(presentation)presentation.sync();
+}
+// Read-only narration: every sentence and marker comes from the real run snapshot.
+function renderNarrative(r){
+ const badge=$('execution-badge'),node=spec.nodes.find(n=>n.id===r.nodeId),scope=areaScope(r.nodeId);
+ badge.hidden=false;badge.dataset.status=r.status;
+ text('narrative-step','STEP '+String(r.trace.length).padStart(2,'0'));
+ text('narrative-scope',scope?label(scope):'主流程');
+ text('narrative-state',runError?'已暂停':r.terminal?'结束 · '+r.status:sim.isWaiting()?'等待决定':autoRunning?'运行中':'已暂停');
+ text('narrative-title',node.label.replace(/\n/g,' '));
+ text('narrative-reason',r.reason||node.docs.goal);
 }
 function visibleCell(id){let cell=graph.model.getCell(id),p=graph.model.getParent(cell);while(p&&p.id!=='1'){if(graph.isCellCollapsed(p))cell=p;p=graph.model.getParent(p);}return cell;}
 function nativeOverlayStyle(h,kind){
@@ -37,8 +48,9 @@ function nativeOverlayStyle(h,kind){
  h.shape.node.classList.toggle('probe-route-active',kind==='active');
  h.shape.node.classList.toggle('probe-route-history',kind==='history');
  h.shape.node.classList.toggle('probe-route-node',kind==='node');
- h.shape.node.classList.toggle('probe-route-paused',!autoRunning);
  h.shape.node.style.pointerEvents='none';
+ if(kind==='active'){h.shape.style={...h.shape.style,endSize:6/graph.view.scale};h.shape.isDashed=false;h.shape.redraw();}
+ if(window.ProbeVisualTheme)ProbeVisualTheme.lightHighlight(h,kind);
 }
 function projectedEdgeState(edge){
  if(!edge)return null;
@@ -59,7 +71,7 @@ function highlight(){
   const visible=visibleCell(event.nodeId),state=graph.view.getState(visible);
   if(state&&metadata(visible).role==='container')areas.set(visible.id,state);
  }
- syncOverlayMap(routeHighlights,edges,'#6fa58d',4,'history');syncOverlayMap(areaHighlights,areas,'#97bfa9',2,'history');
+ syncOverlayMap(routeHighlights,edges,'#609d89',1.35,'history');syncOverlayMap(areaHighlights,areas,'#6b9a8c',1.25,'history');
  currentHighlight.hide();edgeHighlight.hide();
  if(!sim.run)return;
  const state=graph.view.getState(visibleCell(sim.run.nodeId));if(state){currentHighlight.highlight(state);nativeOverlayStyle(currentHighlight,'node');}
@@ -68,24 +80,27 @@ function highlight(){
 }
 function renderFoldButton(){if(!graph)return;let c=graph.model.getCell(selected);if(!c||metadata(c).role!=='container')c=graph.model.getParent(c);while(c&&c.id!=='1'&&(!metadata(c)||metadata(c).role!=='container'))c=graph.model.getParent(c);$('fold-selected').disabled=!c||c.id==='1';$('fold-selected').dataset.target=c&&c.id!=='1'?c.id:'';text('fold-selected',c&&c.id!=='1'?(graph.isCellCollapsed(c)?'展开所选':'收起所选'):'展开所选');}
 function depth(cell){let d=0,p=cell;while(p&&p.id!=='1'){d++;p=graph.model.getParent(p);}return d;}
-function orientation(cell){return !cell||cell.id==='1'||depth(cell)>1?mxConstants.DIRECTION_WEST:mxConstants.DIRECTION_NORTH;}
+function orientation(cell){return ProbeAdaptiveLayout.orientation(graph,cell,!cell||cell.id==='1'||depth(cell)>1?mxConstants.DIRECTION_WEST:mxConstants.DIRECTION_NORTH);}
 function nativeLayout(){
  const model=graph.model,states=new Map(containers.map(c=>[c.id,graph.isCellCollapsed(c)]));const previousBusy=layoutBusy;layoutBusy=true;model.beginUpdate();
  try{
-  ProbeVisualTheme.fitCards(graph);
-  // Compute each real compound graph bottom-up. No coordinates are hand assigned.
+  ProbeAdaptiveLayout.begin(graph);ProbeVisualTheme.fitCards(graph);
+  // Compute native compounds bottom-up in one model transaction. The hierarchy
+  // uses measured model rectangles (useBoundingBox:false) and explicit native
+  // terminal projection, so rendering every intermediate expansion is unnecessary.
   for(const c of [...containers].sort((a,b)=>depth(a)-depth(b)))if(graph.isCellCollapsed(c))graph.foldCells(false,false,[c]);
   for(const parent of [...containers].sort((a,b)=>depth(b)-depth(a))){
    const childGroups=containers.filter(c=>model.getParent(c)===parent),childStates=childGroups.map(c=>[c,graph.isCellCollapsed(c)]);
-   childGroups.forEach(c=>model.setCollapsed(c,true));graph.view.invalidate();graph.view.validate();
-   const layout=new mxHierarchicalLayout(graph,orientation(parent),true);layout.traverseAncestors=false;layout.resizeParent=true;layout.parentBorder=22;layout.moveParent=true;layout.intraCellSpacing=36;layout.interRankCellSpacing=56;layout.parallelEdgeSpacing=20;layout.edgeStyle=mxHierarchicalEdgeStyle.ORTHOGONAL;layout.disableEdgeStyle=false;ProbeVisualTheme.configureHierarchy(layout,parent);layout.execute(parent);
+   childGroups.forEach(c=>model.setCollapsed(c,true));
+   ProbeAdaptiveLayout.execute(graph,parent,{preferred:orientation(parent),targetAspect:1.35,compactnessWeight:.15,configure:ProbeVisualTheme.configureHierarchy});
    childStates.forEach(([c,state])=>model.setCollapsed(c,state));
    if(states.get(parent.id))graph.foldCells(true,false,[parent]);
   }
-  const tops=containers.filter(c=>model.getParent(c).id==='1'),topStates=tops.map(c=>[c,graph.isCellCollapsed(c)]);tops.forEach(c=>model.setCollapsed(c,true));graph.view.invalidate();graph.view.validate();
-  const outer=new mxHierarchicalLayout(graph,mxConstants.DIRECTION_WEST,true);outer.traverseAncestors=false;outer.intraCellSpacing=46;outer.interRankCellSpacing=72;outer.interHierarchySpacing=52;outer.parallelEdgeSpacing=22;outer.edgeStyle=mxHierarchicalEdgeStyle.ORTHOGONAL;outer.disableEdgeStyle=false;ProbeVisualTheme.configureHierarchy(outer,graph.getDefaultParent());outer.execute(graph.getDefaultParent());topStates.forEach(([c,state])=>model.setCollapsed(c,state));
+  const tops=containers.filter(c=>model.getParent(c).id==='1'),topStates=tops.map(c=>[c,graph.isCellCollapsed(c)]);tops.forEach(c=>model.setCollapsed(c,true));
+  ProbeAdaptiveLayout.execute(graph,graph.getDefaultParent(),{preferred:mxConstants.DIRECTION_WEST,targetAspect:graph.container.clientWidth/Math.max(1,graph.container.clientHeight),compactnessWeight:.15,configure:ProbeVisualTheme.configureHierarchy,layout:{resizeParent:false,intraCellSpacing:46,interRankCellSpacing:72,interHierarchySpacing:52,parallelEdgeSpacing:22}});topStates.forEach(([c,state])=>model.setCollapsed(c,state));
   const boundaries=Object.values(model.cells).filter(c=>c.edge&&model.getParent(c.source)!==model.getParent(c.target));
   for(const edge of boundaries){const horizontal=orientation(model.getParent(edge))===mxConstants.DIRECTION_WEST;graph.setCellStyles(mxConstants.STYLE_NOEDGESTYLE,'0',[edge]);graph.setCellStyles(mxConstants.STYLE_EDGE,'orthogonalEdgeStyle',[edge]);for(const [key,v] of [[mxConstants.STYLE_EXIT_X,horizontal?'1':'0.5'],[mxConstants.STYLE_EXIT_Y,horizontal?'0.5':'1'],[mxConstants.STYLE_ENTRY_X,horizontal?'0':'0.5'],[mxConstants.STYLE_ENTRY_Y,horizontal?'0.5':'0']])graph.setCellStyles(key,v,[edge]);}
+  if(window.ProbeOverviewLayout)ProbeOverviewLayout.compose(graph);
  }finally{model.endUpdate();layoutBusy=previousBusy;}
  graph.refresh();graph.view.validate();
  // Native edge-label layout moves labels off native node boxes; retain the
@@ -103,7 +118,7 @@ function focusClass(cell){
 }
 function styleFocusNode(node,cell){if(!node||!node.classList)return;const cls=focusClass(cell);for(const name of ['probe-focus-outside','probe-focus-boundary','probe-focus-ancestor'])node.classList.toggle(name,cls===name);}
 function applyFocusAppearance(){
- if(!graph)return;graph.container.classList.toggle('probe-focused',!!focusId);
+ if(!graph)return;
  for(const cell of Object.values(graph.model.cells)){const state=graph.view.getState(cell);if(state)for(const shape of [state.shape,state.text,state.control])if(shape)styleFocusNode(shape.node,cell);}
  for(const map of [routeHighlights,areaHighlights])for(const [id,h] of map)styleFocusNode(h.shape&&h.shape.node,graph.model.getCell(id));
  for(const h of [currentHighlight,edgeHighlight])if(h)styleFocusNode(h.shape&&h.shape.node,h.state&&h.state.cell);
@@ -168,7 +183,7 @@ function syncDetail(){
   if(key===detailLiveKey&&!detailError)return;
   const scopeChanged=detailScope!==scopeId;configureDetail(scopeId);detailLiveKey=key;detailError=null;
   const events=localEvents(scopeId,run&&run.trace),inside=!!run&&within(graph.model.getCell(run.nodeId),scopeId),event=inside?run.trace.at(-1):null,compound=metadata(graph.model.getCell(scopeId)).role==='container';
-  detail.paint(event,events,!!run&&inside&&autoRunning&&!sim.isWaiting()&&!run.terminal);
+  detail.paint(event,events);
   const state=!run?'尚未开始':runError?'运行中断':run.terminal?'已结束':sim.isWaiting()?'等待决定':autoRunning?'运行中':'已暂停';
   text('detail-mode',(detailManualScope?'手动深入 · ':compound?'实时第三层 · ':'当前最小步骤 · ')+'主流程'+state);
   text('detail-progress',!run?'原图结构查看':`同一运行 ${run.id} · 第 ${run.trace.length} 步${detailManualScope?' · 切换工具后自动跟随':''}`);
@@ -177,6 +192,7 @@ function syncDetail(){
 }
 function openDetail(scopeId,manual=false){
  if(!detail||!scopeId )return;
+ if(presentation)presentation.revealDetail();
  detailSession=detailSession||{expanded:true};
  if(manual){detailManualScope=scopeId;detailManualOwner=sim.run?sim.run.id+'|'+localScope(sim.run.nodeId):null;}else{detailManualScope=null;detailManualOwner=null;if(!sim.run)detailManualScope=scopeId;}
  detailLiveKey=null;render();fitDetail();try{showContract(scopeId,true);}catch(error){detailFailure(error);}
@@ -248,14 +264,15 @@ async function boot(){try{
  text('page-title',spec.title);document.title=spec.title;text('project-description',spec.description||'可复用流程说明与本地模拟');
  graph=new Graph($('graph'));graph.collapsedImage=new mxImage('vendor/collapsed.svg',16,16);graph.expandedImage=new mxImage('vendor/expanded.svg',16,16);graph.setConnectable(false);graph.setCellsEditable(false);graph.setCellsMovable(true);graph.setCellsResizable(false);graph.setCellsBendable(false);graph.setCellsDisconnectable(false);graph.setCellsSelectable(true);graph.setTooltips(false);graph.setDisconnectOnMove(false);graph.setConstrainChildren(false);graph.setAllowNegativeCoordinates(true);graph.setExtendParents(true);graph.setExtendParentsOnMove(true);graph.resetEdgesOnMove=true;graph.setAllowDanglingEdges(false);graph.setDropEnabled(false);graph.setSplitEnabled(false);graph.setCellsCloneable(false);graph.setEdgeLabelsMovable(false);graph.setVertexLabelsMovable(false);graph.foldingEnabled=true;graph.autoScroll=false;graph.autoExtend=false;graph.border=24;
  new mxCodec(doc).decode(modelNode,graph.model);graph.convertValueToString=c=>c.value&&c.value.getAttribute?c.value.getAttribute('label')||'':'';containers=Object.values(graph.model.cells).filter(c=>c.vertex&&metadata(c).role==='container');graph.isCellFoldable=c=>!!(c&&c.vertex&&metadata(c)&&metadata(c).role==='container');ProbeVisualTheme.configure(spec);ProbeVisualTheme.apply(graph);
- adapter={node(id){const n=metadata(graph.model.getCell(id));if(!n)throw Error('未知节点 '+id);return n;}};currentHighlight=new mxCellHighlight(graph,'#7964da',5);currentHighlight.keepOnTop=true;edgeHighlight=new mxCellHighlight(graph,'#7964da',7);edgeHighlight.keepOnTop=true;edgeHighlight.dashed=true;edgeHighlight.getStrokeWidth=()=>7/graph.view.scale;sim=new DiagramRuntime.Simulation(spec);
+ adapter={node(id){const n=metadata(graph.model.getCell(id));if(!n)throw Error('未知节点 '+id);return n;}};currentHighlight=new mxCellHighlight(graph,'#8ef5ff',2.5);currentHighlight.keepOnTop=true;currentHighlight.opacity=100;edgeHighlight=new mxCellHighlight(graph,'#8ef5ff',2.25);edgeHighlight.keepOnTop=true;edgeHighlight.opacity=100;edgeHighlight.dashed=false;edgeHighlight.getStrokeWidth=()=>2.25/graph.view.scale;sim=new DiagramRuntime.Simulation(spec);
  layoutBusy=true;for(const c of [...containers].sort((a,b)=>depth(b)-depth(a)))if(graph.model.getParent(c).id!=='1')graph.foldCells(true,false,[c]);layoutBusy=false;nativeLayout();setupNavigation();setupDetail();
  for(const s of spec.scenarios){const option=document.createElement('option');option.value=s.id;option.textContent=s.title;$('scenario').append(option);}updateScenario();$('scenario').onchange=updateScenario;
  const start=mode=>safe(()=>{haltTimer();runError=null;sim.start($('scenario').value,mode);auto();});$('run-normal').onclick=()=>start('normal');$('run-failure').onclick=()=>start('failure');$('run-wait').onclick=()=>start('wait');
  $('stop-run').onclick=()=>{haltTimer();sim.cancel();render();};$('reset-library').onclick=()=>{haltTimer();runError=null;closeDetail();sim.reset();render();};$('play').onclick=()=>safe(()=>autoRunning?pause():auto());$('step').onclick=()=>safe(()=>{haltTimer();runError=null;sim.step();render();});$('back').onclick=()=>safe(()=>{haltTimer();runError=null;sim.back();render();});$('approve').onclick=()=>safe(()=>{sim.decide('approve');auto();});$('reject').onclick=()=>safe(()=>{sim.decide('reject');auto();});
  $('completion-return').onclick=()=>safe(leaveFocus);$('enter-tool').onclick=()=>safe(()=>enterTool(selected));$('back-view').onclick=()=>safe(backView);$('fit').onclick=fit;$('relayout').onclick=()=>safe(()=>{manualLayout=false;nativeLayout();render();});$('zoom-in').onclick=()=>{graph.zoomIn();render();};$('zoom-out').onclick=()=>{graph.zoomOut();render();};$('focus').onclick=()=>safe(focusCurrent);$('fold-selected').onclick=()=>{const c=graph.model.getCell($('fold-selected').dataset.target);if(c)graph.foldCells(!graph.isCellCollapsed(c),false,[c]);};graph.view.addListener(mxEvent.SCALE,()=>{if(sim)render();});
- $('show-construction').onclick=()=>scrollSideTo('construction-panel');$('export-drawio').onclick=()=>{const mxfile=doc.documentElement.cloneNode(true),diagram=mxfile.getElementsByTagName('diagram')[0],encoded=new mxCodec().encode(graph.model);encoded.setAttribute('portableSpec',JSON.stringify(spec));for(const cell of encoded.getElementsByTagName('mxCell'))cell.setAttribute('style',(cell.getAttribute('style')||'').replace(/html=1(?=;|$)/g,'html=0'));diagram.replaceChildren(encoded);const a=document.createElement('a'),url=URL.createObjectURL(new Blob([mxUtils.getXml(mxfile)],{type:'application/xml'}));a.href=url;a.download='diagram.drawio';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
- $('loading').hidden=true;showContract(selected);fit();window.diagram={graph,simulation:sim,spec,layout:nativeLayout,fit,stop:pause,render,openDetail,closeDetail};window.diagramReady=true;
+ $('show-construction').onclick=()=>scrollSideTo('construction-panel');$('export-drawio').onclick=()=>{const mxfile=doc.documentElement.cloneNode(true),diagram=mxfile.getElementsByTagName('diagram')[0],encoded=new mxCodec().encode(graph.model);encoded.setAttribute('portableSpec',JSON.stringify(spec));encoded.setAttribute('adaptiveColors','none');encoded.setAttribute('background','#0b131d');for(const cell of encoded.getElementsByTagName('mxCell'))cell.setAttribute('style',(cell.getAttribute('style')||'').replace(/html=1(?=;|$)/g,'html=0'));diagram.replaceChildren(encoded);const a=document.createElement('a'),url=URL.createObjectURL(new Blob([mxUtils.getXml(mxfile)],{type:'application/xml'}));a.href=url;a.download='diagram.drawio';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ presentation=ProbePresentationControls.create({onDetailVisibility(visible){if(!visible&&detailSession)closeDetail();detailManualScope=null;detailManualOwner=null;detailLiveKey=null;syncDetail();if(visible)fitDetail();},onResize(){graph.sizeDidChange();graph.view.validate();if(detail&&!$('detail-shell').hidden)fitDetail();},getRunState:()=>({hasRun:!!sim.run,waiting:sim.isWaiting()})});
+ $('loading').hidden=true;showContract(selected);fit();window.diagram={graph,simulation:sim,spec,layout:nativeLayout,fit,stop:pause,render,openDetail,closeDetail,presentation};window.diagramReady=true;
 }catch(error){$('loading').textContent='初始化失败：'+error.message;console.error(error);window.diagramError=error.message;}}
 window.addEventListener('drawio-ready',boot,{once:true});
 })();

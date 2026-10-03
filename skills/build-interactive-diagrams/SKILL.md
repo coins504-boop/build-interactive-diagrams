@@ -5,7 +5,7 @@ description: Build reusable native draw.io interactive architecture or process d
 
 # Build interactive diagrams
 
-Turn the user's actual project into one local, self-contained diagram workspace. Reuse the bundled native draw.io renderer, C-style cards, hierarchy, drag/pan/zoom and live detail projection. Do not replace it with a screenshot, a bare SVG graph, or a fixed demo.
+Turn the user's actual project into one local, self-contained diagram workspace. Reuse the bundled native draw.io renderer, architectural C-style cards, hierarchy, drag/pan/zoom and live detail projection. Do not replace it with a screenshot, a bare SVG graph, or a fixed demo.
 
 ## Establish the model
 
@@ -18,6 +18,14 @@ Create a project-specific JSON spec outside this skill folder. The skill may be 
 - Normal/failure/wait are input modes, not automatically inserted behavior. Supply meaningful paths and acceptance cases for every advertised mode, including wait approval and rejection
 - Use the small declarative action set for local state simulation. Project code, services and prose contracts are not automatically executed
 - Put rules, permission boundaries, implementation guidance and acceptance evidence in node docs; `docs.tests` is prose, while `acceptance` is executable
+
+## Compose a clear visual explanation
+
+Use [references/visual-language.md](references/visual-language.md) for presentation constraints. Preserve the bundled native model, execution core, schema and contract; author project behavior in the spec. The renderer tries official horizontal and vertical layouts within each real container, then packs the actual top-level rectangles. It is a deterministic box-fit heuristic, not a crossing-minimization or arbitrary-scale guarantee.
+
+Keep L1/L2 on the main canvas, L3 in the live corner projection, and deeper levels available on click. Current nodes and the last actual edge have thin cyan outlines, near-white cores and a bounded static halo; completed paths stay subdued green. The short explanation reflects the current runtime snapshot and observed trace, without invented traffic, timelines, progress percentages or outcomes.
+
+Header, toolbar, explanation, inspector and local view hide independently. Keep restore controls reachable; focus mode restores prior choices. With the inspector hidden, move the original run/approval controls into the dock, never clone IDs, handlers, timers or simulation state. Keep Fit accessible, restore local detail at the latest real step, and preserve playback and camera during pane changes.
 
 ## Build and verify
 
@@ -35,11 +43,13 @@ python3 scripts/diagram.py serve /path/to/new-output --port 8000
 
 The output directory must be empty and outside the skill. `doctor` diagnoses; it does not install software. If Node is unavailable, validation/build can run, but disclose that runtime tests were not run. `serve` binds loopback only. Open its URL in an available authorized browser; a remote browser may not share the same localhost. Do not change networking, publish, or install tools just to work around that without suitable authorization.
 
-Check the actual result: node labels and nesting, readable routes, native docs, repeated normal/failure/wait runs, pause/step/back, wait decisions, cancellation, restart, drag/pan/zoom, and opening/closing live detail during playback. Verify that completion preserves the user's view. Run the bundled regression checks after changing the engine:
+Check the actual result: node labels and nesting, readable routes, native docs, repeated normal/failure/wait runs, pause/step/back, wait decisions, cancellation, restart, drag/pan/zoom, and opening/closing live detail during playback. Check independent pane switches, focus restoration, and run/approval controls with the inspector hidden. Verify that completion preserves the user's view. Run the bundled regression checks after changing the presentation or engine:
 
 ```sh
 node tests/runtime.test.js
 python3 tests/package.test.py
+python3 tests/presentation.test.py
+node tests/layout-stress.test.js
 ```
 
 Do not claim visual verification if a browser is unavailable. Report static/runtime checks separately. Large or dense diagrams need their own visual review; the included examples are not proof of all possible projects.

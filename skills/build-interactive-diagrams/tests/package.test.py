@@ -24,14 +24,22 @@ class PackageTests(unittest.TestCase):
    self.assertEqual((ROOT/'assets/vendor/viewer-static.min.js').read_bytes(),(output/'vendor/viewer-static.min.js').read_bytes())
    self.assertTrue((output/'construction.zip').is_file());self.assertTrue((output/'licenses/THIRD-PARTY-NOTICES.txt').is_file())
    with self.assertRaises(ValueError):driver.build(spec,output)
- def test_skill_readonly_safe(self):
+ def test_output_cannot_target_installation(self):
   with self.assertRaises(ValueError):driver.build(BASE,ROOT/'forbidden-output')
  def test_declared_assets_exist(self):
   import re
   html=(ROOT/'assets/index.html').read_text()
   for value in re.findall(r'(?:src|href)="([^"]+)"',html):
    if value.startswith('construction'):continue
-   self.assertTrue((ROOT/'assets'/value).is_file(),value)
+   self.assertTrue((ROOT/'assets'/value.split('?',1)[0]).is_file(),value)
+ def test_release_manifest_integrity(self):
+  files=json.loads((ROOT/'MANIFEST.json').read_text())['files']
+  self.assertTrue(files,'release manifest must not be empty')
+  self.assertNotIn('MANIFEST.json',files,'manifest excludes its own hash')
+  for name,digest in files.items():
+   with self.subTest(file=name):
+    file=(ROOT/name).resolve();self.assertTrue(file.is_relative_to(ROOT),'manifest paths stay in the package')
+    self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),digest)
  def test_viewer_provenance(self):
   self.assertEqual(hashlib.sha256((ROOT/'assets/vendor/viewer-static.min.js').read_bytes()).hexdigest(),'53a25e8f766e759835a3a6a35d7e88742cb41762ed631ddd6944e38723dade33')
 if __name__=='__main__':unittest.main(verbosity=2)
