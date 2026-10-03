@@ -1,0 +1,185 @@
+{
+  "package": "build-interactive-diagrams",
+  "version": "1.0.0",
+  "createdDate": "2026-10-03",
+  "specSchemaVersion": "1.0",
+  "integrity": "SHA-256; MANIFEST.json excludes itself to avoid a circular hash",
+  "auditedFrozenCore": {
+    "assets/app.js": "8bf9f1c5c76c98db9665e333e9fec7d197d489d6058ce1635e7eccd5abebcab1",
+    "assets/engine.js": "873c98c3b89dde958a3965dd7d36d30edca3963f488d978101bdcc7b555c4f56",
+    "assets/native-detail.js": "011d1c7ed8070e5bd089077d10a8cf59bfbf69fe77be11298ba4569d94f0d280",
+    "assets/visual-theme.js": "3def161823e30c12e3695dfc1fb0e18ed5b3788f684deee237b219c219d973be",
+    "assets/style.css": "c4ba31b9dd9afac539f83d93891db6b2e1642e8a4f46d37e147f5c73cd579a75",
+    "assets/index.html": "82a159788fe726aea7a7ea0592ad32871eaf1f1e9d4f56b2cd78c6d5f381b8ac",
+    "assets/vendor/viewer-static.min.js": "53a25e8f766e759835a3a6a35d7e88742cb41762ed631ddd6944e38723dade33",
+    "scripts/diagram.py": "c194783528df705d5655b235303a4fbe092d3324a5f714ce993a7007aae34988",
+    "scripts/run.js": "d1da92fcc920b4a591f6834c2cb782f4b1901e395bcad1701bae6c92b246b903",
+    "references/spec.schema.json": "a30b3e268e304af3d8c3fa6114e12853e4fff3751b3ba4ce4a41c832a2184f1f"
+  },
+  "files": {
+    "SKILL.md": {
+      "sha256": "91582854736eb4c3d2c8aaa82af7ba9aac6767324d3f7950c0b94ca9f41bdd54",
+      "bytes": 4911
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "dce5aa3a0edcaf55f8bc05ce852b6ba3056fe8781c192fbc6887db54a13be4b9",
+      "bytes": 703
+    },
+    "assets/app.js": {
+      "sha256": "8bf9f1c5c76c98db9665e333e9fec7d197d489d6058ce1635e7eccd5abebcab1",
+      "bytes": 33009
+    },
+    "assets/engine.js": {
+      "sha256": "873c98c3b89dde958a3965dd7d36d30edca3963f488d978101bdcc7b555c4f56",
+      "bytes": 6633
+    },
+    "assets/index.html": {
+      "sha256": "82a159788fe726aea7a7ea0592ad32871eaf1f1e9d4f56b2cd78c6d5f381b8ac",
+      "bytes": 6183
+    },
+    "assets/native-detail.js": {
+      "sha256": "011d1c7ed8070e5bd089077d10a8cf59bfbf69fe77be11298ba4569d94f0d280",
+      "bytes": 7177
+    },
+    "assets/style.css": {
+      "sha256": "c4ba31b9dd9afac539f83d93891db6b2e1642e8a4f46d37e147f5c73cd579a75",
+      "bytes": 13418
+    },
+    "assets/vendor/collapsed.svg": {
+      "sha256": "fb212ff83cb7195ce919b1a163c76d8f264de7c602421940f90db1553050fa1b",
+      "bytes": 210
+    },
+    "assets/vendor/expanded.svg": {
+      "sha256": "56a4f9adbcef69109b4d875f33aa8d6a2dbeb08dc3a5af2e5a9c1f134bd8b4a6",
+      "bytes": 204
+    },
+    "assets/vendor/viewer-static.min.js": {
+      "sha256": "53a25e8f766e759835a3a6a35d7e88742cb41762ed631ddd6944e38723dade33",
+      "bytes": 4270872
+    },
+    "assets/visual-theme.js": {
+      "sha256": "3def161823e30c12e3695dfc1fb0e18ed5b3788f684deee237b219c219d973be",
+      "bytes": 6830
+    },
+    "examples/greenhouse.json": {
+      "sha256": "44e4e2ace28681a7c1b6b829eaa2f635eb896d657cb43eb6382429cba170f765",
+      "bytes": 13358
+    },
+    "examples/release-pipeline.json": {
+      "sha256": "6c6628cd070d3be98e500753f6a2aaf4c272f0b5e9f42867e865c1e742cc1878",
+      "bytes": 12789
+    },
+    "licenses/DOMPurify-3.4.16-LICENSE-MPL.txt": {
+      "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+      "bytes": 16726
+    },
+    "licenses/DOMPurify-3.4.16-LICENSE.txt": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    },
+    "licenses/PROJECT-MIT-LICENSE.txt": {
+      "sha256": "c17bd2167c4b144ddb07d27e5badd034be185845f672b1dc8b33e2692dfb8b8b",
+      "bytes": 1765
+    },
+    "licenses/THIRD-PARTY-NOTICES.txt": {
+      "sha256": "d3a533fa5734c37e3a8784572aa4deb272d6940e16486f6b7167e91446081cb7",
+      "bytes": 5126
+    },
+    "licenses/babel-helpers-LICENSE.txt": {
+      "sha256": "4be9d87b56a306293223b490c0d0b245e9e94f39884147bf051a6c7b825aeb30",
+      "bytes": 1189
+    },
+    "licenses/drawio-UPSTREAM-TERMS.txt": {
+      "sha256": "945d39f86e5343422b7ba4480e893dc08523cbe99f4a41915f412fcf4155095d",
+      "bytes": 1611
+    },
+    "licenses/drawio-base64-SOURCE-NOTICE.txt": {
+      "sha256": "33786519afbbafbfd052b086b5510d5148f7b41e0d1ce0156c158ad813745089",
+      "bytes": 166
+    },
+    "licenses/drawio-v31.7.0-LICENSE.txt": {
+      "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+      "bytes": 11356
+    },
+    "licenses/drawio-v31.7.0-shapes-LICENSE.txt": {
+      "sha256": "55f8931a59e1f6e3ffff6c950c44339981c4806925ac0d97517a71164b0ca2ea",
+      "bytes": 629
+    },
+    "licenses/drawio-v31.7.0-stencils-LICENSE.txt": {
+      "sha256": "f4098ff053b5954abbf69b15811ef06cd277847ca49934beda355c3d841ebdac",
+      "bytes": 630
+    },
+    "licenses/hachure-fill-0.5.2-LICENSE": {
+      "sha256": "5e807b516a9be9229ed459880bf353a336e2d947867247290680d437017be391",
+      "bytes": 1068
+    },
+    "licenses/mxgraph-SOURCE-NOTICE.txt": {
+      "sha256": "b8e658abc04b785a8824aa20381442744b8876744f816eef0bec5c776cb19048",
+      "bytes": 95
+    },
+    "licenses/pako-2.2.0-LICENSE.txt": {
+      "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539",
+      "bytes": 1104
+    },
+    "licenses/pako-2.2.0-zlib-README.txt": {
+      "sha256": "20356aece8f36fda34645e97af3b163da0a88e253b78ffba298590d5b9121ebb",
+      "bytes": 2180
+    },
+    "licenses/path-data-parser-0.1.0-LICENSE": {
+      "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71",
+      "bytes": 1068
+    },
+    "licenses/points-on-curve-0.2.0-LICENSE": {
+      "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71",
+      "bytes": 1068
+    },
+    "licenses/points-on-path-0.2.1-LICENSE": {
+      "sha256": "b6fc1f7f1d96a48bc97176f3dcef959e364c5c17ba44167511de421500a86c6c",
+      "bytes": 1062
+    },
+    "licenses/roughjs-4.6.6-LICENSE": {
+      "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d",
+      "bytes": 1068
+    },
+    "licenses/spin.js-2.0.0-LICENSE.txt": {
+      "sha256": "5793f85563bd2b74d7d8c1fb41bdfd0967c58e1b56f5d7b0d30fb23ca06cde3c",
+      "bytes": 1097
+    },
+    "licenses/spin.js-2.0.0-SOURCE-NOTICE.txt": {
+      "sha256": "e91c362ce21d49db31d89443f5521c355307b7f6331cd8f36999024305c9bdfd",
+      "bytes": 81
+    },
+    "references/VALIDATION.md": {
+      "sha256": "962e0b52a916e4ffd0cb5bd5821362ede051cc8545cd828811e822cb3a1d29fc",
+      "bytes": 3444
+    },
+    "references/contract.md": {
+      "sha256": "f49ae21978cd8c4ddce8db63095720fa643c8025a22680dade0da9be1b84241a",
+      "bytes": 6826
+    },
+    "references/spec.schema.json": {
+      "sha256": "a30b3e268e304af3d8c3fa6114e12853e4fff3751b3ba4ce4a41c832a2184f1f",
+      "bytes": 9099
+    },
+    "references/使用说明.md": {
+      "sha256": "04672bc7c14deccde08522608924675e75346e78e82c458314847574f00c6c27",
+      "bytes": 4933
+    },
+    "scripts/diagram.py": {
+      "sha256": "c194783528df705d5655b235303a4fbe092d3324a5f714ce993a7007aae34988",
+      "bytes": 16887
+    },
+    "scripts/run.js": {
+      "sha256": "d1da92fcc920b4a591f6834c2cb782f4b1901e395bcad1701bae6c92b246b903",
+      "bytes": 2895
+    },
+    "tests/package.test.py": {
+      "sha256": "2a9136635f8da75812244e1f04ea0e5d64cddb65ef96d2155ecef7373fe946f4",
+      "bytes": 3273
+    },
+    "tests/runtime.test.js": {
+      "sha256": "092df1c5c6fa969762f7f9bd14ba91c46fa5201f4ff0d2361aa8e0cbd1a7e3f5",
+      "bytes": 5681
+    }
+  }
+}

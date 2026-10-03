@@ -1,0 +1,563 @@
+{
+  "schemaVersion": "1.0",
+  "title": "软件发布 · 从候选构建到回滚",
+  "description": "构建、测试、审批与发布产物的虚构本地模型",
+  "entry": "candidate",
+  "maxSteps": 100,
+  "context": {
+    "version": "2.4.0",
+    "attempts": 0,
+    "artifacts": [],
+    "production": "2.3.9"
+  },
+  "nodes": [
+    {
+      "id": "prepare",
+      "label": "构建流水线",
+      "role": "container",
+      "docs": {
+        "goal": "构建流水线",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      }
+    },
+    {
+      "id": "build",
+      "label": "候选构建",
+      "role": "container",
+      "docs": {
+        "goal": "候选构建",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "prepare"
+    },
+    {
+      "id": "candidate",
+      "label": "接收发布候选",
+      "role": "source",
+      "docs": {
+        "goal": "接收发布候选",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "prepare"
+    },
+    {
+      "id": "compile",
+      "label": "编译产物",
+      "role": "step",
+      "docs": {
+        "goal": "编译产物",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "build",
+      "actions": [
+        {
+          "op": "increment",
+          "path": "attempts"
+        },
+        {
+          "op": "copy",
+          "path": "candidateVersion",
+          "from": "version"
+        }
+      ]
+    },
+    {
+      "id": "tests",
+      "label": "运行测试",
+      "role": "router",
+      "docs": {
+        "goal": "运行测试",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "build"
+    },
+    {
+      "id": "retry",
+      "label": "保留失败诊断",
+      "role": "step",
+      "docs": {
+        "goal": "保留失败诊断",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "build",
+      "actions": [
+        {
+          "op": "append",
+          "path": "artifacts",
+          "value": "test-report"
+        }
+      ]
+    },
+    {
+      "id": "retryGate",
+      "label": "重试预算",
+      "role": "router",
+      "docs": {
+        "goal": "重试预算",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "build"
+    },
+    {
+      "id": "delivery",
+      "label": "交付与审批",
+      "role": "container",
+      "docs": {
+        "goal": "交付与审批",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      }
+    },
+    {
+      "id": "releaseGate",
+      "label": "发布策略",
+      "role": "router",
+      "docs": {
+        "goal": "发布策略",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "delivery"
+    },
+    {
+      "id": "review",
+      "label": "批准发布候选",
+      "role": "wait",
+      "docs": {
+        "goal": "批准发布候选",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "delivery"
+    },
+    {
+      "id": "deploy",
+      "label": "模拟切换版本",
+      "role": "step",
+      "docs": {
+        "goal": "模拟切换版本",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "delivery",
+      "actions": [
+        {
+          "op": "copy",
+          "from": "candidateVersion",
+          "path": "production"
+        },
+        {
+          "op": "append",
+          "path": "artifacts",
+          "value": "deployment-record"
+        }
+      ]
+    },
+    {
+      "id": "success",
+      "label": "发布完成",
+      "role": "terminal",
+      "docs": {
+        "goal": "发布完成",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "released",
+      "parent": "delivery"
+    },
+    {
+      "id": "failed",
+      "label": "保留旧版与诊断",
+      "role": "terminal",
+      "docs": {
+        "goal": "保留旧版与诊断",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "failed",
+      "parent": "delivery"
+    },
+    {
+      "id": "rejected",
+      "label": "候选不发布",
+      "role": "terminal",
+      "docs": {
+        "goal": "候选不发布",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "rejected",
+      "parent": "delivery"
+    }
+  ],
+  "edges": [
+    {
+      "id": "candidateBuild",
+      "source": "candidate",
+      "target": "compile",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "buildTest",
+      "source": "compile",
+      "target": "tests",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "testFails",
+      "source": "tests",
+      "target": "retry",
+      "label": "测试失败",
+      "kind": "failure",
+      "when": {
+        "all": [
+          {
+            "field": "mode",
+            "op": "eq",
+            "value": "failure"
+          },
+          {
+            "field": "context.attempts",
+            "op": "lte",
+            "value": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "testPasses",
+      "source": "tests",
+      "target": "releaseGate",
+      "label": "测试通过",
+      "kind": "normal"
+    },
+    {
+      "id": "recordFailure",
+      "source": "retry",
+      "target": "retryGate",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "tryAgain",
+      "source": "retryGate",
+      "target": "compile",
+      "label": "还有一次重试",
+      "kind": "resume",
+      "when": {
+        "field": "context.attempts",
+        "op": "lt",
+        "value": 2
+      }
+    },
+    {
+      "id": "exhausted",
+      "source": "retryGate",
+      "target": "failed",
+      "label": "重试耗尽",
+      "kind": "failure"
+    },
+    {
+      "id": "manualRelease",
+      "source": "releaseGate",
+      "target": "review",
+      "label": "等待审批",
+      "kind": "wait",
+      "when": {
+        "field": "mode",
+        "op": "eq",
+        "value": "wait"
+      }
+    },
+    {
+      "id": "autoRelease",
+      "source": "releaseGate",
+      "target": "deploy",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "releaseApprove",
+      "source": "review",
+      "target": "deploy",
+      "label": "批准",
+      "kind": "resume",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "approve"
+      }
+    },
+    {
+      "id": "releaseReject",
+      "source": "review",
+      "target": "rejected",
+      "label": "拒绝",
+      "kind": "reject",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "reject"
+      }
+    },
+    {
+      "id": "deployFinish",
+      "source": "deploy",
+      "target": "success",
+      "label": "",
+      "kind": "normal"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "release-candidate",
+      "title": "发布候选 2.4.0"
+    },
+    {
+      "id": "hotfix",
+      "title": "热修复 2.3.10",
+      "context": {
+        "version": "2.3.10"
+      }
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "normal",
+      "scenario": "release-candidate",
+      "mode": "normal",
+      "expect": {
+        "status": "released",
+        "context": {
+          "production": "2.4.0",
+          "attempts": 1
+        }
+      }
+    },
+    {
+      "id": "hotfix",
+      "scenario": "hotfix",
+      "mode": "normal",
+      "expect": {
+        "status": "released",
+        "context": {
+          "production": "2.3.10"
+        }
+      }
+    },
+    {
+      "id": "failure-exhaustion",
+      "scenario": "release-candidate",
+      "mode": "failure",
+      "expect": {
+        "status": "failed",
+        "context": {
+          "production": "2.3.9",
+          "attempts": 2
+        },
+        "traceExcludes": [
+          "deploy"
+        ]
+      }
+    },
+    {
+      "id": "wait-stops",
+      "scenario": "release-candidate",
+      "mode": "wait",
+      "expect": {
+        "status": "waiting",
+        "context": {
+          "production": "2.3.9"
+        }
+      }
+    },
+    {
+      "id": "approve",
+      "scenario": "release-candidate",
+      "mode": "wait",
+      "expect": {
+        "status": "released"
+      },
+      "decisions": [
+        "approve"
+      ]
+    },
+    {
+      "id": "reject",
+      "scenario": "release-candidate",
+      "mode": "wait",
+      "expect": {
+        "status": "rejected",
+        "context": {
+          "production": "2.3.9"
+        }
+      },
+      "decisions": [
+        "reject"
+      ]
+    }
+  ]
+}

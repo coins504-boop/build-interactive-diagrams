@@ -1,0 +1,35 @@
+# OS, editor, and local settings
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+
+# Runtime caches and local dependencies
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+node_modules/
+*.log
+
+# Generated workspaces, packaging, and local verification artifacts
+*-output/
+output/
+out/
+dist/
+build/
+coverage/
+screenshots/
+test-results/
+playwright-report/
+*.zip
+*.zip.sha256
+
+# Tutorial working copy may contain private project information
+/project-spec.json

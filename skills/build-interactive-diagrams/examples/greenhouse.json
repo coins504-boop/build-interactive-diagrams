@@ -1,0 +1,593 @@
+{
+  "schemaVersion": "1.0",
+  "title": "温室灌溉 · 从观测到用水决定",
+  "description": "传感器读数、干湿阈值、人工批准和失败保护的本地模型",
+  "entry": "begin",
+  "context": {
+    "soil": {
+      "moisture": 24
+    },
+    "threshold": 30,
+    "waterLiters": 0,
+    "events": []
+  },
+  "maxSteps": 100,
+  "nodes": [
+    {
+      "id": "observe",
+      "label": "观测与判断",
+      "role": "container",
+      "docs": {
+        "goal": "观测与判断",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      }
+    },
+    {
+      "id": "sensors",
+      "label": "传感器处理",
+      "role": "container",
+      "docs": {
+        "goal": "传感器处理",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "observe"
+    },
+    {
+      "id": "measure",
+      "label": "读取土壤湿度",
+      "role": "step",
+      "docs": {
+        "goal": "读取土壤湿度",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "sensors",
+      "actions": [
+        {
+          "op": "copy",
+          "from": "soil.moisture",
+          "path": "reading"
+        },
+        {
+          "op": "append",
+          "path": "events",
+          "value": "measured"
+        }
+      ]
+    },
+    {
+      "id": "quality",
+      "label": "读取有效？",
+      "role": "router",
+      "docs": {
+        "goal": "读取有效？",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "sensors"
+    },
+    {
+      "id": "begin",
+      "label": "定时触发",
+      "role": "source",
+      "docs": {
+        "goal": "定时触发",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "observe"
+    },
+    {
+      "id": "needWater",
+      "label": "需要灌溉？",
+      "role": "router",
+      "docs": {
+        "goal": "需要灌溉？",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "observe"
+    },
+    {
+      "id": "waterPlan",
+      "label": "灌溉与保护",
+      "role": "container",
+      "docs": {
+        "goal": "灌溉与保护",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      }
+    },
+    {
+      "id": "modeGate",
+      "label": "执行前策略",
+      "role": "router",
+      "docs": {
+        "goal": "执行前策略",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "waterPlan"
+    },
+    {
+      "id": "approval",
+      "label": "确认本次用水",
+      "role": "wait",
+      "docs": {
+        "goal": "确认本次用水",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "waterPlan"
+    },
+    {
+      "id": "valve",
+      "label": "模拟打开阀门",
+      "role": "step",
+      "docs": {
+        "goal": "模拟打开阀门",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "waterPlan",
+      "actions": [
+        {
+          "op": "increment",
+          "path": "waterLiters",
+          "by": 2
+        },
+        {
+          "op": "append",
+          "path": "events",
+          "value": "watered"
+        }
+      ]
+    },
+    {
+      "id": "watered",
+      "label": "灌溉结束",
+      "role": "terminal",
+      "docs": {
+        "goal": "灌溉结束",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "watered",
+      "parent": "waterPlan"
+    },
+    {
+      "id": "skip",
+      "label": "湿度足够",
+      "role": "terminal",
+      "docs": {
+        "goal": "湿度足够",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "skipped",
+      "parent": "waterPlan"
+    },
+    {
+      "id": "alarm",
+      "label": "读数故障保护",
+      "role": "terminal",
+      "docs": {
+        "goal": "读数故障保护",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "failed",
+      "parent": "waterPlan",
+      "actions": [
+        {
+          "op": "set",
+          "path": "alarm",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "label": "人工暂缓",
+      "role": "terminal",
+      "docs": {
+        "goal": "人工暂缓",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "status": "held",
+      "parent": "waterPlan"
+    },
+    {
+      "id": "manual",
+      "label": "栽培用水规范",
+      "role": "store",
+      "docs": {
+        "goal": "只读参考阈值，不进入控制路径",
+        "inputs": [],
+        "outputs": [
+          "本例阈值30为虚构演示值"
+        ],
+        "rules": [],
+        "permissions": [
+          "只修改本地模拟状态"
+        ],
+        "construction": {
+          "adapter": "需另行实现真实适配器",
+          "sideEffects": "none"
+        },
+        "tests": [
+          "节点动作成功才提交状态；每次迁移对应真实边"
+        ]
+      },
+      "parent": "observe"
+    }
+  ],
+  "edges": [
+    {
+      "id": "startRead",
+      "source": "begin",
+      "target": "measure",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "readQuality",
+      "source": "measure",
+      "target": "quality",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "sensorFault",
+      "source": "quality",
+      "target": "alarm",
+      "label": "读取故障",
+      "kind": "failure",
+      "when": {
+        "field": "mode",
+        "op": "eq",
+        "value": "failure"
+      }
+    },
+    {
+      "id": "sensorOkay",
+      "source": "quality",
+      "target": "needWater",
+      "label": "有效读数",
+      "kind": "normal"
+    },
+    {
+      "id": "dry",
+      "source": "needWater",
+      "target": "modeGate",
+      "label": "低于阈值",
+      "kind": "normal",
+      "when": {
+        "field": "context.reading",
+        "op": "lt",
+        "value": 30
+      }
+    },
+    {
+      "id": "wet",
+      "source": "needWater",
+      "target": "skip",
+      "label": "无需灌溉",
+      "kind": "normal"
+    },
+    {
+      "id": "needsReview",
+      "source": "modeGate",
+      "target": "approval",
+      "label": "人工模式",
+      "kind": "wait",
+      "when": {
+        "field": "mode",
+        "op": "eq",
+        "value": "wait"
+      }
+    },
+    {
+      "id": "automatic",
+      "source": "modeGate",
+      "target": "valve",
+      "label": "自动执行",
+      "kind": "normal"
+    },
+    {
+      "id": "approved",
+      "source": "approval",
+      "target": "valve",
+      "label": "批准",
+      "kind": "resume",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "approve"
+      }
+    },
+    {
+      "id": "declined",
+      "source": "approval",
+      "target": "held",
+      "label": "拒绝",
+      "kind": "reject",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "reject"
+      }
+    },
+    {
+      "id": "finishWater",
+      "source": "valve",
+      "target": "watered",
+      "label": "",
+      "kind": "normal"
+    },
+    {
+      "id": "reference",
+      "source": "manual",
+      "target": "needWater",
+      "label": "只读阈值说明",
+      "kind": "data"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "dry-bed",
+      "title": "干燥菜床",
+      "context": {
+        "soil": {
+          "moisture": 24
+        }
+      }
+    },
+    {
+      "id": "moist-bed",
+      "title": "湿润菜床",
+      "context": {
+        "soil": {
+          "moisture": 47
+        }
+      }
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "dry-normal",
+      "scenario": "dry-bed",
+      "mode": "normal",
+      "expect": {
+        "status": "watered",
+        "context": {
+          "waterLiters": 2,
+          "reading": 24
+        },
+        "traceIncludes": [
+          "measure",
+          "valve"
+        ],
+        "traceExcludes": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "id": "moist-normal",
+      "scenario": "moist-bed",
+      "mode": "normal",
+      "expect": {
+        "status": "skipped",
+        "context": {
+          "waterLiters": 0
+        }
+      }
+    },
+    {
+      "id": "sensor-failure",
+      "scenario": "dry-bed",
+      "mode": "failure",
+      "expect": {
+        "status": "failed",
+        "context": {
+          "waterLiters": 0,
+          "alarm": true
+        }
+      }
+    },
+    {
+      "id": "wait-stops",
+      "scenario": "dry-bed",
+      "mode": "wait",
+      "expect": {
+        "status": "waiting"
+      }
+    },
+    {
+      "id": "approve",
+      "scenario": "dry-bed",
+      "mode": "wait",
+      "expect": {
+        "status": "watered",
+        "context": {
+          "waterLiters": 2
+        }
+      },
+      "decisions": [
+        "approve"
+      ]
+    },
+    {
+      "id": "reject",
+      "scenario": "dry-bed",
+      "mode": "wait",
+      "expect": {
+        "status": "held",
+        "context": {
+          "waterLiters": 0
+        }
+      },
+      "decisions": [
+        "reject"
+      ]
+    }
+  ]
+}

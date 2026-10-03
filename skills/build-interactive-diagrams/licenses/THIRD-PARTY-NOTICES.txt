@@ -1,0 +1,87 @@
+THIRD-PARTY NOTICES: draw.io viewer-static.min.js
+
+The accompanying viewer-static.min.js is redistributed unchanged from draw.io v31.7.0.
+Official source:
+https://raw.githubusercontent.com/jgraph/drawio/v31.7.0/src/main/webapp/js/viewer-static.min.js
+Size: 4,270,872 bytes
+SHA-256: 53a25e8f766e759835a3a6a35d7e88742cb41762ed631ddd6944e38723dade33
+Both the existing supplied copy and a separately retrieved official copy have this hash.
+
+This vendor file is not relicensed by the surrounding skill. It contains draw.io,
+mxGraph, embedded shapes, and third-party JavaScript. Keep its embedded notices and
+this license directory with copies of the viewer, including generated distribution
+bundles that copy or inline the viewer. The surrounding skill's license does not
+replace the licenses or terms of these components.
+
+1. draw.io and mxGraph
+The draw.io v31.7.0 repository identifies its source code as Apache License 2.0.
+The full text is drawio-v31.7.0-LICENSE.txt. Preserve source notices; selected
+source-attribution headers are also copied as mxgraph-SOURCE-NOTICE.txt and
+drawio-base64-SOURCE-NOTICE.txt. The latter credits Webtoolkit Base64 code.
+https://github.com/jgraph/drawio/blob/v31.7.0/LICENSE
+https://github.com/jgraph/drawio/blob/v31.7.0/README.md
+https://github.com/jgraph/drawio/blob/v31.7.0/src/main/webapp/js/deflate/base64.js
+https://github.com/jgraph/drawio/blob/v31.7.0/src/main/webapp/mxgraph/src/mxClient.js
+
+2. Embedded shapes and stencil libraries
+These have separate upstream terms, reproduced in drawio-v31.7.0-shapes-LICENSE.txt
+and drawio-v31.7.0-stencils-LICENSE.txt. Those terms restrict using or distributing
+these assets in the Atlassian product/marketplace/plugin ecosystem without written
+permission. Upstream exempts end-user diagram output from that restriction.
+Do not describe the entire viewer bundle as exclusively Apache-2.0.
+https://github.com/jgraph/drawio/blob/v31.7.0/src/main/webapp/shapes/LICENSE
+https://github.com/jgraph/drawio/blob/v31.7.0/src/main/webapp/stencils/LICENSE
+
+3. DOMPurify 3.4.16
+Copyright Cure53 and other contributors. The viewer retains its dual Apache-2.0 /
+MPL-2.0 notice. Both upstream license files are included unchanged.
+https://github.com/cure53/DOMPurify/blob/3.4.16/LICENSE
+https://github.com/cure53/DOMPurify/blob/3.4.16/LICENSE-MPL
+
+4. Babel regenerator helpers/runtime
+The viewer's embedded notice identifies Facebook, Inc. and links the Babel helpers
+MIT license. That linked license is included as babel-helpers-LICENSE.txt; it
+includes both the Sebastian McKenzie/contributors and Facebook attributions.
+https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE
+An exact Babel release is not stated in the viewer notice.
+
+5. Pako 2.2.0
+MIT and Zlib. Both pako-2.2.0-LICENSE.txt and pako-2.2.0-zlib-README.txt are included.
+The latter contains the zlib license and copyright notices for Jean-loup Gailly,
+Mark Adler, Vitaly Puzrin, and Andrey Tupitsin.
+https://github.com/nodeca/pako/blob/2.2.0/LICENSE
+https://github.com/nodeca/pako/blob/2.2.0/lib/zlib/README
+
+6. spin.js 2.0.0
+MIT. spin.js-2.0.0-LICENSE.txt is from the published 2.0.0 npm package. The 2.0.0
+source copyright header is separately retained in spin.js-2.0.0-SOURCE-NOTICE.txt.
+https://registry.npmjs.org/spin.js/2.0.0
+https://github.com/fgnass/spin.js/blob/2.0.0/spin.js
+
+7. Rough.js 4.6.6 and its runtime dependencies
+MIT. draw.io's versioned README identifies Rough.js 4.6.6, and its complete
+rough.min.js is present verbatim in the viewer. The Rough.js license is from the
+published package and matches its release git commit license. The same release
+commit's package-lock resolves hachure-fill 0.5.2, points-on-path 0.2.1,
+points-on-curve 0.2.0, and path-data-parser 0.1.0. Their published-package MIT
+licenses are included to preserve dependency notices. This does not claim a
+byte-level reconstruction of each nested dependency from the minified bundle.
+https://github.com/jgraph/drawio/blob/v31.7.0/src/main/webapp/js/rough/README.md
+https://registry.npmjs.org/roughjs/4.6.6
+https://github.com/rough-stuff/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/LICENSE
+https://github.com/rough-stuff/rough/blob/56a2762171b1294d643501e8d14f120db6b27bd7/package-lock.json
+https://registry.npmjs.org/hachure-fill/0.5.2
+https://registry.npmjs.org/points-on-path/0.2.1
+https://registry.npmjs.org/points-on-curve/0.2.0
+https://registry.npmjs.org/path-data-parser/0.1.0
+
+Scope of this notice collection
+Prepared 2026-10-03 by inspecting the supplied viewer, its exact matching official
+release, the versioned build recipe, and identifiable dependency releases. This
+is a bounded provenance and notice collection, not a complete legal audit of
+every embedded shape, historical contribution, or third-party icon. Upstream's
+README states that some icons have third-party copyright holders. No root NOTICE
+file was present in the retrieved complete v31.7.0 repository tree. Reassess if
+the vendor is changed, additional assets are added, or distribution targets an
+Atlassian-related product. Do not imply draw.io endorsement or use its logo as
+the skill's branding.
