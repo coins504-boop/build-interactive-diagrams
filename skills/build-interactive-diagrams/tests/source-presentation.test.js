@@ -11,6 +11,25 @@ assert.equal(JSON.stringify(spec),original);assert.deepEqual(topology(),before);
 assert.equal(graph.model.isVisible(graph.model.getCell('root')),false);
 assert.equal(graph.model.getParent(graph.model.getCell('a')).id,'1');assert.equal(graph.model.getParent(graph.model.getCell('deep')).id,'a');assert.equal(graph.model.getParent(graph.model.getCell('one')).id,'deep');
 const visual=api.visualSpec(spec);assert.equal(visual.nodes.some(n=>n.id==='root'),false);assert.equal(visual.nodes.find(n=>n.id==='a').parent,undefined);assert.equal(spec.nodes.find(n=>n.id==='a').parent,'root');
+// app.boot folds every non-top-level container after display projection. Report
+// actual native flags and ancestor visibility, not a count of authored levels.
+const initialReport=config=>{
+ const input={...spec,sourcePresentation:config},g=r.createGraph(input);api.projectHierarchy(g,input);
+ const depth=cell=>{let d=0;for(let c=cell;c&&c.id!=='1';c=g.model.getParent(c))d++;return d;};
+ const groups=Object.values(g.model.cells).filter(c=>c.vertex&&g.model.isVisible(c)&&c.value.getAttribute('role')==='container');
+ for(const c of groups.sort((a,b)=>depth(b)-depth(a)))if(g.model.getParent(c).id!=='1')g.foldCells(true,false,[c]);
+ const before=JSON.stringify(Object.values(g.model.cells).map(c=>({id:c.id,parent:c.parent&&c.parent.id,collapsed:c.collapsed,source:c.source&&c.source.id,target:c.target&&c.target.id})));
+ const rows=api.visibilityReport(g,input);
+ assert.equal(JSON.stringify(Object.values(g.model.cells).map(c=>({id:c.id,parent:c.parent&&c.parent.id,collapsed:c.collapsed,source:c.source&&c.source.id,target:c.target&&c.target.id}))),before,'report reads native state without changing topology/folds');
+ return JSON.parse(JSON.stringify(rows));
+};
+const promoted=initialReport({overviewRoot:'root'}),plain=initialReport(undefined),disabled=initialReport({overviewRoot:null});
+assert.deepEqual(promoted.filter(n=>n.visibility==='visible').map(n=>n.id),['a','b','deep','two']);
+assert.deepEqual(plain.filter(n=>n.visibility==='visible').map(n=>n.id),['root','a','b']);assert.deepEqual(disabled,plain);
+assert.equal(promoted.find(n=>n.id==='one').visibility,'hidden','real subgroup stays collapsed; no arbitrary flattening');
+assert.deepEqual(promoted.find(n=>n.id==='one').hiddenBy,['deep']);assert.deepEqual(plain.find(n=>n.id==='two').hiddenBy,['b']);
+assert.equal(promoted.find(n=>n.id==='two').displayDepth,2);assert.equal(plain.find(n=>n.id==='two').displayDepth,3);
+assert.throws(()=>api.projectHierarchy(r.createGraph({...spec,sourcePresentation:{overviewRoot:'missing'}}),{...spec,sourcePresentation:{overviewRoot:'missing'}}),/Unknown source presentation/);
 let selection=[],refreshes=0;const selectionEvents=new r.context.mxEventSource();graph.getSelectionModel=()=>selectionEvents;graph.getSelectionCells=()=>selection;graph.refresh=()=>{refreshes++;};const viewEvents=new r.context.mxEventSource();graph.view.addListener=viewEvents.addListener.bind(viewEvents);graph.convertValueToString=c=>c.value.getAttribute('label');graph.setTooltips=enabled=>{graph.tooltipEnabled=enabled;};api.configureEdges(graph,spec);
 assert.equal(graph.convertValueToString(graph.model.getCell('transfer')),'');assert.equal(graph.convertValueToString(graph.model.getCell('dependency')),'');
 const select=id=>{selection=id?[graph.model.getCell(id)]:[];selectionEvents.fireEvent(new r.context.mxEventObject(r.context.mxEvent.CHANGE));};

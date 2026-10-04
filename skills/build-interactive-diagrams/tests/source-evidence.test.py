@@ -45,6 +45,18 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(report['sourceChecks'][0]['status'], 'not-checked')
         self.assertIn('Does not establish claim truth', report['meaning'])
 
+    def test_unmapped_claim_and_unused_evidence_warning_order_is_sorted(self):
+        spec = fixture(); model = spec['sourceModel']
+        claim_ids = ['unmapped_' + str(i) for i in reversed(range(10))]
+        evidence_ids = ['unused_' + str(i) for i in reversed(range(10))]
+        model['claims'].extend(dict(model['claims'][0], id=ident) for ident in claim_ids)
+        model['evidence'].extend(dict(model['evidence'][0], id=ident) for ident in evidence_ids)
+        original = copy.deepcopy(spec)
+        warnings = checker.check(spec)['warnings']
+        self.assertEqual([w.split(':', 1)[0] for w in warnings if ': claim is not mapped' in w], sorted(claim_ids))
+        self.assertEqual([w.split(':', 1)[0] for w in warnings if ': evidence is not used' in w], sorted(evidence_ids))
+        self.assertEqual(spec, original, 'Diagnostic ordering must not change authored source claims/evidence')
+
     def test_snapshot_checks_bytes_lines_and_inventory(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); self.make_source(root); (root / 'omitted.txt').write_text('unclassified')
