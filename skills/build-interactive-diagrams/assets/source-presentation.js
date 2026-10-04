@@ -12,6 +12,19 @@ function projectHierarchy(graph,spec){
   model.setVisible(root,false);
  }finally{model.endUpdate();}
 }
+// Inspect the current native hierarchy/fold state, including ancestors. This is
+// model visibility, not rendered pixels, readable labels or fit-to-screen QA.
+function visibilityReport(graph,spec){
+ const m=graph.model,top=graph.getDefaultParent();
+ return spec.nodes.map(n=>{
+  const cell=m.getCell(n.id);if(!cell)throw Error('Missing presentation node '+n.id);
+  const parent=m.getParent(cell),hiddenBy=[];let displayDepth=1;
+  if(!m.isVisible(cell))hiddenBy.push(cell.id);
+  for(let p=parent;p&&p!==top;p=m.getParent(p)){displayDepth++;if(!m.isVisible(p)||m.isCollapsed(p))hiddenBy.push(p.id);}
+  return{id:n.id,label:n.label,role:n.role,originalParent:n.parent||null,displayParent:parent&&parent!==top?parent.id:null,
+   displayDepth,collapsed:m.isCollapsed(cell),visibility:hiddenBy.length?'hidden':'visible',hiddenBy};
+ });
+}
 function composeOrdered(graph,spec){
  const rootId=spec.sourcePresentation&&spec.sourcePresentation.overviewRoot;if(!rootId)return false;
  const m=graph.model,top=graph.getDefaultParent();
@@ -84,5 +97,5 @@ function evidenceDetails(data,spec,scopeId){
  if((data.boundaries||[]).length){const boundaries=create('details');boundaries.append(create('summary','系统边界'));for(const b of data.boundaries)boundaries.append(create('p',b.label+'：'+b.description));root.append(boundaries);}
  return root;
 }
-global.ProbeSourcePresentation={visualSpec,projectHierarchy,composeOrdered,configureEdges,evidenceDetails};
+global.ProbeSourcePresentation={visualSpec,projectHierarchy,visibilityReport,composeOrdered,configureEdges,evidenceDetails};
 })(typeof window!=='undefined'?window:globalThis);
