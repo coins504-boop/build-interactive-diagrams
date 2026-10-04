@@ -206,8 +206,16 @@
       ],
       "properties": {
         "overviewRoot": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "criticalNodeIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          }
         },
         "projection": {
           "type": "string"
