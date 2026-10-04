@@ -39,3 +39,7 @@
 源码模式保留所有控制与读写/数据关系。Fit 总览以真实顶层模块对的可计数虚线摘要展示数据关系；55% 或更高缩放显示细分类数量，较低缩放保留工具提示和全局统计。每条数据边恰属一个摘要，双向箭头表示两方向都有关系，不表示执行顺序。选中模块递归揭示真实关联边；播放跟随实际活动模块。空白处恢复总览，全部连线显示所有原始数据边。手动平移或暂停不清除选择。
 
 摘要是非执行显示单元，不加入规格、原生导出或局部投影，也不作布局输入。规范节点/边及端点不变。折叠时只高亮实际执行边自身可见状态；若隐藏则保留祖先节点和真实轨迹 ID，绝不以同端点兄弟边冒充。
+
+## Connection paint order
+
+The player paints expanded container backgrounds first, native connections and their labels next, then history/active route overlays, then cards and vertex text. Leaf and collapsed-container fills are 90% opaque; text and outlines retain their normal opacity. Active glow can remain faintly visible through a card without painting over its text. Expanded group bodies stay opaque beneath routes so internal connections remain visible. This shared presentation applies to main and live-detail views; it does not change routing, canonical edges, playback, or solve dense-caption collisions. Browser-exported native styles retain fill opacity, but the player-specific SVG stacking is not a full-editor draw-order guarantee.

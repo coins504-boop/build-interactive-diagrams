@@ -54,10 +54,40 @@ function routerExportSnapshot(graph,cell){const saved=routerExportSnapshots.get(
 function fitCards(graph,cells){const model=graph.model;model.beginUpdate();try{for(const cell of cells||Object.values(model.cells)){if(!cell.vertex||!info(cell))continue;const n=info(cell),geometry=model.getGeometry(cell);if(!geometry)continue;const size=cardSize(graph,cell),geo=geometry.clone();if(n.role==='container'&&!graph.isCellCollapsed(cell)){if(geo.alternateBounds){geo.alternateBounds=geo.alternateBounds.clone();geo.alternateBounds.width=size.width;geo.alternateBounds.height=size.height;}}else{geo.width=size.width;geo.height=size.height;}model.setGeometry(cell,geo);if(n.role==='router'){const p=routerLabels.get(n.label);routerExportSnapshots.set(cell,{canonical:n.label,display:p.label,width:geo.width,height:geo.height,signature:routerRenderSignature(graph,cell)});}}}finally{model.endUpdate();}}
 // The engine must see actual nested terminals as their immediate visible tool.
 function configureHierarchy(layout,parent){const m=layout.graph.model;const visible=cell=>{let c=cell;while(c&&m.getParent(c)!==parent)c=m.getParent(c);return c&&c.vertex?c:null;};const links=Object.values(m.cells).filter(e=>e.edge&&e.value.getAttribute('presentationOnly')!=='true'&&m.getParent(e)===parent).map(edge=>({edge,source:visible(m.getTerminal(edge,true)),target:visible(m.getTerminal(edge,false))})).filter(x=>x.source&&x.target&&x.source!==x.target);const map=new Map(links.map(x=>[x.edge.id,x]));const horizontal=layout.orientation===mxConstants.DIRECTION_WEST;m.beginUpdate();try{for(const {edge} of links)nativeStyle(m,edge,{exitX:horizontal?'1':'0.5',exitY:horizontal?'0.5':'1',entryX:horizontal?'0':'0.5',entryY:horizontal?'0.5':'0',entryPerimeter:'1',exitPerimeter:'1'});}finally{m.endUpdate();}layout.getEdges=cell=>links.filter(x=>x.source===cell||x.target===cell).map(x=>x.edge);layout.getVisibleTerminal=(edge,source)=>{const x=map.get(edge.id);return x?(source?x.source:x.target):null;};}
+// Preserve native shapes, listeners and coordinates; only their SVG paint order changes.
+// Expanded group bodies stay behind routes. Cards (including folded groups) and
+// all vertex text stay above them. Never lower the entire native draw pane.
+function stackConnections(graph){
+ const view=graph.view,pane=view.getDrawPane();if(!pane)return;
+ const ranks=new Map();
+ for(const cell of Object.values(graph.model.cells)){
+  const state=view.getState(cell);if(!state)continue;
+  const expanded=cell.vertex&&info(cell)?.role==='container'&&!graph.isCellCollapsed(cell);
+  for(const [shape,rank]of [[state.shape,cell.edge?1:expanded?0:3],[state.text,cell.edge?1:3],[state.control,3]]){
+   if(shape&&shape.node&&shape.node.parentNode===pane)ranks.set(shape.node,rank);
+  }
+ }
+ const nodes=Array.from(pane.childNodes),rank=node=>node._probeConnectionOverlay?2:(ranks.get(node)??3);
+ const ordered=nodes.slice().sort((a,b)=>rank(a)-rank(b));
+ if(ordered.some((node,i)=>node!==nodes[i]))for(const node of ordered)pane.appendChild(node);
+}
+function installConnectionStack(graph){
+ if(!graph.view?.getDrawPane||graph._probeConnectionStack)return;graph._probeConnectionStack=true;
+ const validate=graph.view.validate;
+ graph.view.validate=function(...args){const result=validate.apply(this,args);stackConnections(graph);return result;};
+}
+function lowerConnectionHighlight(highlight){
+ if(!highlight?.state?.cell?.edge||!highlight.graph||!highlight.shape?.node)return;
+ const node=highlight.shape.node,pane=highlight.graph.view.getDrawPane();
+ if(node.parentNode===pane)return; // Existing routes are restacked by native validation.
+ node._probeConnectionOverlay=true;pane.appendChild(node);
+ stackConnections(highlight.graph);
+}
 // Native highlight geometry is reused for both the restrained halo and hot core.
 // No timer, motion, graph/model writes, synthetic edge or execution state is added.
 let lightSequence=0;
 function lightHighlight(highlight,kind){
+ lowerConnectionHighlight(highlight);
  const shape=highlight&&highlight.shape;if(!shape||!shape.node||!['active','node'].includes(kind))return;
  shape._probeLightKind=kind;
  if(!shape._probeLightRedraw){const redraw=shape.redraw;shape._probeLightRedraw=redraw;shape.redraw=function(...args){const result=redraw.apply(this,args);paintLight(this);return result;};}
@@ -86,14 +116,14 @@ function paintLight(shape){
  }
 }
 
-function apply(graph){if(graph.setAdaptiveColors)graph.setAdaptiveColors('none');const model=graph.model;model.beginUpdate();try{for(const cell of Object.values(model.cells)){const n=info(cell);if(!n)continue;if(cell.vertex){const area=areaFor(graph,cell),top=!!areas[cell.id],compound=n.role==='container';let fill=area?area.fill:'#162332',stroke=area?area.stroke:'#57748c';if(n.role==='source'){fill='#162a25';stroke='#568e7b';}if(n.role==='terminal'){fill='#202936';stroke='#76879a';}if(n.role==='router'||n.role==='wait'){fill='#2b271c';stroke='#a38b53';}if(n.role==='store'){fill='#251f33';stroke='#83709e';}
- const style={html:n.role==='router'?'0':'1',fillColor:fill,strokeColor:stroke,fontColor:'#e0e8f0',fontFamily:'Noto Sans CJK SC',fontSize:top?'19':'17',strokeWidth:top?'1.5':'1.2',rounded:'1',arcSize:top?'9':'12',shadow:'0',spacing:n.role==='router'?'12':'0',spacingLeft:'0',align:'center',verticalAlign:'middle',whiteSpace:'wrap'};
+function apply(graph){installConnectionStack(graph);if(graph.setAdaptiveColors)graph.setAdaptiveColors('none');const model=graph.model;model.beginUpdate();try{for(const cell of Object.values(model.cells)){const n=info(cell);if(!n)continue;if(cell.vertex){const area=areaFor(graph,cell),top=!!areas[cell.id],compound=n.role==='container';let fill=area?area.fill:'#162332',stroke=area?area.stroke:'#57748c';if(n.role==='source'){fill='#162a25';stroke='#568e7b';}if(n.role==='terminal'){fill='#202936';stroke='#76879a';}if(n.role==='router'||n.role==='wait'){fill='#2b271c';stroke='#a38b53';}if(n.role==='store'){fill='#251f33';stroke='#83709e';}
+ const style={fillOpacity:compound&&!graph.isCellCollapsed(cell)?'100':'90',html:n.role==='router'?'0':'1',fillColor:fill,strokeColor:stroke,fontColor:'#e0e8f0',fontFamily:'Noto Sans CJK SC',fontSize:top?'19':'17',strokeWidth:top?'1.5':'1.2',rounded:'1',arcSize:top?'9':'12',shadow:'0',spacing:n.role==='router'?'12':'0',spacingLeft:'0',align:'center',verticalAlign:'middle',whiteSpace:'wrap'};
  if(compound){style.swimlaneFillColor=top?area.body:'#111c28';style.startSize=top?'54':'46';style.fontStyle='0';style.align='left';}nativeStyle(model,cell,style);
  }else if(cell.edge){const kind=cell.value.getAttribute('kind'),colors={normal:'#8295a9',failure:'#bd9273',wait:'#b99d60',resume:'#68a38b',reject:'#af8092',data:'#7e739d'};nativeStyle(model,cell,{html:'0',strokeColor:colors[kind]||colors.normal,fontColor:'#c3cdd7',labelBackgroundColor:'#0c1520',labelBorderColor:'none',fontFamily:'Noto Sans CJK SC',fontSize:'13',strokeWidth:kind==='data'?'1.2':'1.5',opacity:kind==='data'?'65':'100',dashed:['data','failure','wait','reject'].includes(kind)?'1':'0',dashPattern:kind==='data'?'2 5':'6 4',endArrow:'blockThin',endSize:'7',rounded:'1',arcSize:'12'});}}
  }finally{model.endUpdate();}
  graph.convertValueToString=cell=>label(graph,cell);graph.isHtmlLabel=cell=>!!cell.vertex&&info(cell)&&info(cell).role!=='router';
  // A folded native swimlane uses the whole card for its title and tool count.
- if(!graph._cStyleBase){graph._cStyleBase=graph.getCellStyle;graph.getCellStyle=function(cell,...args){const style=this._cStyleBase.call(this,cell,...args),n=info(cell);if(n&&n.role==='container'&&this.isCellCollapsed(cell)){const geo=this.model.getGeometry(cell);return{...style,startSize:geo?geo.height:76};}return style;};}
+ if(!graph._cStyleBase){graph._cStyleBase=graph.getCellStyle;graph.getCellStyle=function(cell,...args){const style=this._cStyleBase.call(this,cell,...args),n=info(cell);if(n&&n.role==='container'&&this.isCellCollapsed(cell)){const geo=this.model.getGeometry(cell);return{...style,fillOpacity:'90',startSize:geo?geo.height:76};}if(n&&n.role==='container')return{...style,fillOpacity:'100'};return style;};}
 }
-global.ProbeVisualTheme={configure,apply,nativeStyle,fitCards,cardSize,routerExportSnapshot,configureHierarchy,lightHighlight};
+global.ProbeVisualTheme={configure,apply,nativeStyle,fitCards,cardSize,routerExportSnapshot,configureHierarchy,lightHighlight,stackConnections};
 })(typeof window!=='undefined'?window:globalThis);
