@@ -1,0 +1,670 @@
+{
+  "schemaVersion": "1.0",
+  "title": "终点呈现 · 生命周期与业务结果分开",
+  "description": "可重现的呈现层测试，不把完成回放解释为业务成功",
+  "entry": "start",
+  "context": {
+    "route": "completed_success",
+    "businessOutcome": null
+  },
+  "nodes": [
+    {
+      "id": "area",
+      "label": "终点呈现测试",
+      "role": "container",
+      "docs": {
+        "goal": "每条分支只演示声明的结果",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      }
+    },
+    {
+      "id": "start",
+      "parent": "area",
+      "label": "接收演示输入",
+      "role": "source",
+      "docs": {
+        "goal": "读取所选分支",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      }
+    },
+    {
+      "id": "choose",
+      "parent": "area",
+      "label": "选择已声明的结果",
+      "role": "router",
+      "docs": {
+        "goal": "按 route 选择一条真实边",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      }
+    },
+    {
+      "id": "event_wait",
+      "parent": "area",
+      "label": "等待外部事件",
+      "role": "wait",
+      "waitPresentation": {
+        "intent": "event"
+      },
+      "docs": {
+        "goal": "等待本地模拟事件",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      }
+    },
+    {
+      "id": "completed_success",
+      "parent": "area",
+      "label": "应用收到成功结果",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：success。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "success"
+        }
+      ]
+    },
+    {
+      "id": "completed_error",
+      "parent": "area",
+      "label": "应用收到业务错误",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：business-error。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "business-error"
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "parent": "area",
+      "label": "向调用者交回失败",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：failure。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "failure"
+        }
+      ],
+      "status": "failed"
+    },
+    {
+      "id": "cancelled",
+      "parent": "area",
+      "label": "流程按模型取消",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：cancelled。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "cancelled"
+        }
+      ],
+      "status": "cancelled"
+    },
+    {
+      "id": "raised",
+      "parent": "area",
+      "label": "向调用者抛出异常",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：exception。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "exception"
+        }
+      ],
+      "status": "raised"
+    },
+    {
+      "id": "timed_out",
+      "parent": "area",
+      "label": "调用者超时，任务未撤销",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：timeout。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "timeout"
+        }
+      ],
+      "status": "timed-out"
+    },
+    {
+      "id": "custom",
+      "parent": "area",
+      "label": "自定义结束，没有结果分类",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：unknown。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "unknown"
+        }
+      ],
+      "status": "customstatus"
+    },
+    {
+      "id": "waiting_terminal",
+      "parent": "area",
+      "label": "讲解已结束，状态文字为 waiting",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：unknown。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "unknown"
+        }
+      ],
+      "status": "waiting"
+    },
+    {
+      "id": "success_token",
+      "parent": "area",
+      "label": "状态文字 success 仍未获通用语义",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：unknown。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "unknown"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "id": "markup",
+      "parent": "area",
+      "label": "标签 <b>成功</b> & 状态为自定义",
+      "role": "terminal",
+      "docs": {
+        "goal": "演示结果：unknown。回放结束不代表业务成功。",
+        "inputs": "本地解释模型输入",
+        "outputs": "记录本例描述的结果",
+        "rules": "状态文字不是全局业务结果枚举",
+        "permissions": "本地回放",
+        "construction": "测试用合成模型，不执行仓库代码",
+        "tests": "终点状态保持原值，呈现为中性结束"
+      },
+      "actions": [
+        {
+          "op": "set",
+          "path": "businessOutcome",
+          "value": "unknown"
+        }
+      ],
+      "status": "<success>"
+    }
+  ],
+  "edges": [
+    {
+      "id": "begin",
+      "source": "start",
+      "target": "choose"
+    },
+    {
+      "id": "route_completed_success",
+      "source": "choose",
+      "target": "completed_success",
+      "label": "应用收到成功结果",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "completed_success"
+      }
+    },
+    {
+      "id": "route_completed_error",
+      "source": "choose",
+      "target": "completed_error",
+      "label": "应用收到业务错误",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "completed_error"
+      }
+    },
+    {
+      "id": "route_failed",
+      "source": "choose",
+      "target": "failed",
+      "label": "向调用者交回失败",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "failed"
+      }
+    },
+    {
+      "id": "route_cancelled",
+      "source": "choose",
+      "target": "cancelled",
+      "label": "流程按模型取消",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "cancelled"
+      }
+    },
+    {
+      "id": "route_raised",
+      "source": "choose",
+      "target": "raised",
+      "label": "向调用者抛出异常",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "raised"
+      }
+    },
+    {
+      "id": "route_timed_out",
+      "source": "choose",
+      "target": "timed_out",
+      "label": "调用者超时，任务未撤销",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "timed_out"
+      }
+    },
+    {
+      "id": "route_custom",
+      "source": "choose",
+      "target": "custom",
+      "label": "自定义结束，没有结果分类",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "custom"
+      }
+    },
+    {
+      "id": "route_waiting_terminal",
+      "source": "choose",
+      "target": "waiting_terminal",
+      "label": "讲解已结束，状态文字为 waiting",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "waiting_terminal"
+      }
+    },
+    {
+      "id": "route_success_token",
+      "source": "choose",
+      "target": "success_token",
+      "label": "状态文字 success 仍未获通用语义",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "success_token"
+      }
+    },
+    {
+      "id": "route_markup",
+      "source": "choose",
+      "target": "markup",
+      "label": "标签 <b>成功</b> & 状态为自定义",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "markup"
+      }
+    },
+    {
+      "id": "route_wait",
+      "source": "choose",
+      "target": "event_wait",
+      "when": {
+        "field": "context.route",
+        "op": "eq",
+        "value": "event_wait"
+      }
+    },
+    {
+      "id": "event_arrives",
+      "source": "event_wait",
+      "target": "completed_success",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "approve"
+      }
+    },
+    {
+      "id": "event_cancel",
+      "source": "event_wait",
+      "target": "cancelled",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "reject"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "completed_success",
+      "title": "应用收到成功结果",
+      "context": {
+        "route": "completed_success"
+      }
+    },
+    {
+      "id": "completed_error",
+      "title": "应用收到业务错误",
+      "context": {
+        "route": "completed_error"
+      }
+    },
+    {
+      "id": "failed",
+      "title": "向调用者交回失败",
+      "context": {
+        "route": "failed"
+      }
+    },
+    {
+      "id": "cancelled",
+      "title": "流程按模型取消",
+      "context": {
+        "route": "cancelled"
+      }
+    },
+    {
+      "id": "raised",
+      "title": "向调用者抛出异常",
+      "context": {
+        "route": "raised"
+      }
+    },
+    {
+      "id": "timed_out",
+      "title": "调用者超时，任务未撤销",
+      "context": {
+        "route": "timed_out"
+      }
+    },
+    {
+      "id": "custom",
+      "title": "自定义结束，没有结果分类",
+      "context": {
+        "route": "custom"
+      }
+    },
+    {
+      "id": "waiting_terminal",
+      "title": "讲解已结束，状态文字为 waiting",
+      "context": {
+        "route": "waiting_terminal"
+      }
+    },
+    {
+      "id": "success_token",
+      "title": "状态文字 success 仍未获通用语义",
+      "context": {
+        "route": "success_token"
+      }
+    },
+    {
+      "id": "markup",
+      "title": "标签 <b>成功</b> & 状态为自定义",
+      "context": {
+        "route": "markup"
+      }
+    },
+    {
+      "id": "event_wait",
+      "title": "真实等待事件（非终点）",
+      "context": {
+        "route": "event_wait"
+      }
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "case_completed_success",
+      "scenario": "completed_success",
+      "expect": {
+        "status": "completed",
+        "nodeId": "completed_success",
+        "context": {
+          "businessOutcome": "success"
+        }
+      }
+    },
+    {
+      "id": "case_completed_error",
+      "scenario": "completed_error",
+      "expect": {
+        "status": "completed",
+        "nodeId": "completed_error",
+        "context": {
+          "businessOutcome": "business-error"
+        }
+      }
+    },
+    {
+      "id": "case_failed",
+      "scenario": "failed",
+      "expect": {
+        "status": "failed",
+        "nodeId": "failed",
+        "context": {
+          "businessOutcome": "failure"
+        }
+      }
+    },
+    {
+      "id": "case_cancelled",
+      "scenario": "cancelled",
+      "expect": {
+        "status": "cancelled",
+        "nodeId": "cancelled",
+        "context": {
+          "businessOutcome": "cancelled"
+        }
+      }
+    },
+    {
+      "id": "case_raised",
+      "scenario": "raised",
+      "expect": {
+        "status": "raised",
+        "nodeId": "raised",
+        "context": {
+          "businessOutcome": "exception"
+        }
+      }
+    },
+    {
+      "id": "case_timed_out",
+      "scenario": "timed_out",
+      "expect": {
+        "status": "timed-out",
+        "nodeId": "timed_out",
+        "context": {
+          "businessOutcome": "timeout"
+        }
+      }
+    },
+    {
+      "id": "case_custom",
+      "scenario": "custom",
+      "expect": {
+        "status": "customstatus",
+        "nodeId": "custom",
+        "context": {
+          "businessOutcome": "unknown"
+        }
+      }
+    },
+    {
+      "id": "case_waiting_terminal",
+      "scenario": "waiting_terminal",
+      "expect": {
+        "status": "waiting",
+        "nodeId": "waiting_terminal",
+        "context": {
+          "businessOutcome": "unknown"
+        }
+      }
+    },
+    {
+      "id": "case_success_token",
+      "scenario": "success_token",
+      "expect": {
+        "status": "success",
+        "nodeId": "success_token",
+        "context": {
+          "businessOutcome": "unknown"
+        }
+      }
+    },
+    {
+      "id": "case_markup",
+      "scenario": "markup",
+      "expect": {
+        "status": "<success>",
+        "nodeId": "markup",
+        "context": {
+          "businessOutcome": "unknown"
+        }
+      }
+    },
+    {
+      "id": "pending",
+      "scenario": "event_wait",
+      "expect": {
+        "status": "waiting",
+        "nodeId": "event_wait"
+      }
+    },
+    {
+      "id": "resume",
+      "scenario": "event_wait",
+      "decisions": [
+        "approve"
+      ],
+      "expect": {
+        "status": "completed",
+        "nodeId": "completed_success"
+      }
+    },
+    {
+      "id": "reject",
+      "scenario": "event_wait",
+      "decisions": [
+        "reject"
+      ],
+      "expect": {
+        "status": "cancelled",
+        "nodeId": "cancelled"
+      }
+    }
+  ]
+}

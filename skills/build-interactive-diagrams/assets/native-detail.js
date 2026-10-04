@@ -16,7 +16,7 @@ class NativeDetail{
  }
  setScope(source,scopeId){
   const g=this.graph;this.singleId=null;this.current.hide();this.edge.hide();for(const h of this.history.values())h.destroy();this.history.clear();g.view.setCurrentRoot(null);
-  const model=new mxGraphModel();new mxCodec().decode(new mxCodec().encode(source.model),model);g.model.setRoot(model.getRoot());this.scopeId=scopeId;const scope=model.getCell(scopeId);if(!scope)throw Error('局部视图找不到原图节点');
+  const model=new mxGraphModel(),encoded=new mxCodec().encode(source.model);if(source._focusedConnections)source._focusedConnections.stripExport(encoded);new mxCodec().decode(encoded,model);g.model.setRoot(model.getRoot());this.scopeId=scopeId;const scope=model.getCell(scopeId);if(!scope)throw Error('局部视图找不到原图节点');
   model.beginUpdate();try{model.setCollapsed(scope,false);for(const c of Object.values(model.cells))if(c.vertex&&c!==scope&&c.value.getAttribute('role')==='container'&&!g.isCellCollapsed(c))g.foldCells(true,false,[c]);}finally{model.endUpdate();}
   const compound=scope.value.getAttribute('role')==='container';this.singleId=compound?null:scopeId;g.view.setCurrentRoot(compound?scope:model.getParent(scope));if(global.ProbeVisualTheme){global.ProbeVisualTheme.apply(g);global.ProbeVisualTheme.fitCards(g,compound?g.getChildVertices(scope):[scope]);}g.view.validate();if(!compound){this.finishScope();return;}ProbeAdaptiveLayout.begin(g);ProbeAdaptiveLayout.execute(g,scope,{preferred:mxConstants.DIRECTION_WEST,targetAspect:1.35,compactnessWeight:.15,configure:ProbeVisualTheme.configureHierarchy,layout:{resizeParent:false,intraCellSpacing:30,interRankCellSpacing:34,parallelEdgeSpacing:18}});this.finishScope();
  }

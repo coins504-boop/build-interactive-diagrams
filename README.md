@@ -2,7 +2,7 @@
 
 把项目资料变成可以展开、播放、检查和交付的交互式工程图。
 
-**版本：1.3.0**。保留原有执行引擎，更新原生布局、当前路径细线光效和独立面板控制。版本号不代表任意项目都能直接适用，或已经在 Codex / Hermes 中完成端到端验证。
+**版本：1.4.0**。一个完整技能，支持需求设计与授权源码解释：按需选择职责概览、重点流程或深入复核，保留来源证据、覆盖限制和实际构建收据。更新源码呈现、等待/终态说明与原生导出保真。版本号不代表任意项目都能直接适用，或已经在 Codex / Hermes 中完成端到端验证。
 
 第一方代码、文档与合成示例采用 [MIT 许可证](LICENSE)。第三方组件继续适用其各自条款，详见文末许可说明。
 
@@ -76,15 +76,34 @@ skills:
 
 上述说明是目录与格式兼容的安装方法，不是已在两个宿主中实际调用成功的声明。宿主更新后，请以相应官方文档为准。
 
+
+### 已安装旧版本
+
+先更新仓库，再备份现有的完整技能目录，并用 `skills/build-interactive-diagrams/` 整目录替换旧副本。不要把新版零散文件叠加到改过的旧版，也不要只替换 `SKILL.md`。重新打开宿主并确认加载的是清单版本 1.4.0；这一步需要在实际使用的 Codex/Hermes 环境中完成。
+
 ## 推荐提示词
 
-替换三个方括号中的内容即可使用；在 Codex 中也可将第一句技能名写作 `$build-interactive-diagrams`。
+在 Codex 中先明确调用 `$build-interactive-diagrams`，再选择需要的深度。替换方括号中的内容：
 
-> 请使用 build-interactive-diagrams skill，为【项目名称】制作交互式工程图。项目资料是【文件或目录】，目标是【希望实现和验证的效果】。
-> 先依据资料确定模块、工具、内部步骤及父子关系，再生成图。不同业务输入要有对应路线，并覆盖正常、失败、等待、重试及拒绝等适用情况。每个节点补齐目标、职责、输入输出、规则、权限、施工要求和验收条件。缺失信息明确标注，不要编造。
-> 沿用 skill 的完整画布和动态演示能力。交付前检查层级、分支、反复播放，以及图与施工资料的一致性；说明哪些已验证、哪些仍待确认。
+**从需求设计**
+
+> 用 $build-interactive-diagrams 把【需求或授权资料目录】画成一张中文交互式工程图。先讲清职责和端到端流程，标出假设；为适用分支做本地演示，交付工作区和施工包。
+
+**从源码解释重点流程**
+
+> 用 $build-interactive-diagrams，只读【授权仓库目录/版本】，用中文解释【重点流程】和周边职责。重点流程可连续播放；保留源码证据、失败与未知边界，不运行上游项目，明确实际覆盖范围。完成源码构建与验证流程，交付实际构建收据，并检查浏览器交互。
+
+**先做概览**
+
+> 用 $build-interactive-diagrams 给【项目】做职责概览，并演示【一个流程】。未深入的地方明确标注，不把概览说成全仓库验证。
+
+**按需复核已有图**
+
+> 对已有图的【具体范围】深入复核源码、默认行为、所有权/异步边界和反例；只修证据确认的问题，保留旧版及验证限制。
 
 第一次体验可以补充：“先用技能自带的温室灌溉示例生成到一个新的空目录，完成 CLI 测试，再启动本地预览；不连接真实设备。”
+
+请保留技能提供的原生画布与运行器，不要用静态截图或临时重写的演示替代。源码哈希、模拟通过和构建收据证明的范围不同，都不能证明全部源码行为或生产等价。完整说明见 [使用说明](skills/build-interactive-diagrams/references/使用说明.md)。
 
 项目资料只提供已获授权的文件和目录。不要把密码、令牌或个人隐私放进规格，生成结果会包含原始规格和节点说明。
 
@@ -164,27 +183,11 @@ python3 skills/build-interactive-diagrams/scripts/diagram.py build project-spec.
 
 ## 测试与验证范围
 
-在 Python 3.12.14、Node.js 24.19.0 环境运行本仓库附带检查：
+日常画图按 [技能入口](skills/build-interactive-diagrams/SKILL.md) 运行相应的验证/构建流程；不必每次执行完整包维护测试。源码重建须使用 [源码重建指南](skills/build-interactive-diagrams/references/repository-reconstruction.md) 的构建与验证流程，并交付真实收据。
 
-- 两个公开示例共 **12 个验收用例通过**
-- 运行时回归：**1,507 个断言、120 轮重复运行通过**
-- 包与生成器检查：**7 组**，覆盖无效输入拒绝、原始文档保真、原生图内完整规格、施工文件哈希、输出目录限制及 viewer 字节保真
-- 呈现回归：**8 组**，涵盖主题数据保真、真实控制器、32 种面板组合、光芯/光晕和矩形排布；使用 DOM/模型替身，不冒充浏览器验收
-- 官方原生几何：**300 / 600 / 1,000 节点**各测折叠与全展开，配套 **84 项执行验收**；范围与限制见验证摘要
+发布文件可用 `MANIFEST.json` 中的 SHA-256 核对；清单不包含其自身。源码、模型验收、包完整性与浏览器检查应分别报告，不能相互替代。维护与回归命令见 [验证说明](skills/build-interactive-diagrams/references/VALIDATION.md)。
 
-复现命令：
-
-```sh
-cd skills/build-interactive-diagrams
-python3 scripts/diagram.py test examples/greenhouse.json
-python3 scripts/diagram.py test examples/release-pipeline.json
-node tests/runtime.test.js
-python3 tests/package.test.py
-python3 tests/presentation.test.py
-node tests/layout-stress.test.js
-```
-
-详情见 [可复现验证摘要](skills/build-interactive-diagrams/references/VALIDATION.md)。自动化检查不启动 Codex、Hermes 或 GUI；自动化通过不代表视觉可读性、任意项目正确性或宿主端到端兼容已经证明。
+自动化检查不启动 Codex、Hermes 或上游项目。通过不代表任意项目的语义正确性、视觉可读性或宿主端到端兼容已经证明。原生导出仍有完整编辑器编辑/保存/重导入未经全面验证等边界；不要把模型收据称为生产认证。
 
 ## 已知边界
 

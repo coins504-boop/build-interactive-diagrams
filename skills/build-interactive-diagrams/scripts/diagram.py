@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build self-contained draw.io simulation workspaces; Python standard library only."""
-import argparse, zipfile, math, hashlib, json, re, shutil, subprocess, sys
+import argparse, zipfile, math, hashlib, html as html_entities, json, re, shutil, subprocess, sys
 from pathlib import Path
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = {'container','source','step','router','wait','terminal','store'}
@@ -19,12 +20,76 @@ def safe_json(value):
     elif isinstance(value,float) and not math.isfinite(value): error('Nonfinite JSON number')
     elif isinstance(value,list):
         for v in value: safe_json(v)
-def condition(c):
+SAFE_INTEGER=9007199254740991
+MISSING=object()
+def finite_number(v,label):
+    if isinstance(v,bool) or not isinstance(v,(int,float)): error('Model domain error: '+label+' requires finite number')
+    # Match JSON.parse rounding before testing the IEEE-754 finite boundary.
+    try: normalized=float(v)
+    except OverflowError: error('Model domain error: '+label+' requires finite number')
+    if not math.isfinite(normalized): error('Model domain error: '+label+' requires finite number')
+def finite_tree(v):
+    if isinstance(v,(int,float)) and not isinstance(v,bool): finite_number(v,'JSON input')
+    elif isinstance(v,dict):
+        for x in v.values(): finite_tree(x)
+    elif isinstance(v,list):
+        for x in v: finite_tree(x)
+def safe_integer(v): return not isinstance(v,bool) and isinstance(v,(int,float)) and abs(v)<=SAFE_INTEGER and int(v)==v
+def validate_domains(domains):
+    if not isinstance(domains,list): error('inputDomains must be array')
+    seen=set()
+    for d in domains:
+        if not isinstance(d,dict): error('Domain must be object')
+        path_ok(d.get('path'))
+        if d['path'] in seen: error('Duplicate domain path: '+d['path'])
+        seen.add(d['path'])
+        if 'enum' in d:
+            if set(d)!={'path','enum'} or not isinstance(d['enum'],list) or not d['enum']: error('Domain enum requires nonempty scalar array')
+            for v in d['enum']:
+                if v is not None and not isinstance(v,(str,int,float,bool)): error('Domain enum requires scalars')
+                if isinstance(v,(int,float)) and not isinstance(v,bool): finite_number(v,'Domain enum')
+        else:
+            if set(d)-{'path','type','min','max','allowNull'} or d.get('type') not in ('number','integer'): error('Invalid numeric domain')
+            if 'allowNull' in d and not isinstance(d['allowNull'],bool): error('allowNull must be boolean')
+            for k in ('min','max'):
+                if k in d:
+                    finite_number(d[k],'Domain '+k)
+                    if d['type']=='integer' and not safe_integer(d[k]): error('Integer bound must be safe')
+            if 'min' in d and 'max' in d and float(d['min'])>float(d['max']): error('Domain min exceeds max')
+def scalar_equal(a,b):
+    # JSON numbers have IEEE-754 semantics in the shared browser/Node engine.
+    numeric=lambda v:isinstance(v,(int,float)) and not isinstance(v,bool)
+    if numeric(a) and numeric(b): return float(a)==float(b)
+    return type(a) is type(b) and a==b
+def check_domains(context,domains,scenario):
+    for d in domains:
+        v=context
+        for k in d['path'].split('.'):
+            if isinstance(v,dict): v=v.get(k,MISSING)
+            elif isinstance(v,list): v=len(v) if k=='length' else v[int(k)] if k.isascii() and k.isdigit() and str(int(k))==k and int(k)<len(v) else MISSING
+            else: v=MISSING
+        label='scenario '+scenario+' path '+d['path']
+        if v is MISSING: error('Model domain error: '+label+' is required')
+        if 'enum' in d:
+            if not any(scalar_equal(x,v) for x in d['enum']): error('Model domain error: '+label+' must be in enum')
+            continue
+        if v is None and d.get('allowNull',False): continue
+        finite_number(v,label)
+        if d['type']=='integer' and not safe_integer(v): error('Model domain error: '+label+' requires safe integer')
+        if 'min' in d and float(v)<float(d['min']): error('Model domain error: '+label+' below min')
+        if 'max' in d and float(v)>float(d['max']): error('Model domain error: '+label+' above max')
+def condition(c, version="1.0"):
     if not isinstance(c,dict): error('Condition must be an object')
     if len(c)==1 and next(iter(c)) in {'all','any','not'}:
         key=next(iter(c)); values=[c[key]] if key=='not' else c[key]
         if not isinstance(values,list) or not values: error('all/any conditions need nonempty arrays')
-        for v in values: condition(v)
+        for v in values: condition(v, version)
+        return
+    if 'valueField' in c:
+        if version!='1.1' or set(c)!={'field','op','valueField'} or c['op'] not in {'gt','gte','lt','lte'}: error('valueField requires schemaVersion 1.1 and an unambiguous numeric comparison')
+        for field in (c['field'],c['valueField']):
+            if not isinstance(field,str) or not field.startswith('context.'): error('Numeric references require context.<path>')
+            path_ok(field[8:])
         return
     if set(c)!={'field','op','value'}: error('Condition requires exactly field, op, value')
     field=c['field']
@@ -35,7 +100,16 @@ def condition(c):
     if op in {'gt','gte','lt','lte'} and (not isinstance(v,(int,float)) or isinstance(v,bool)): error('Numeric comparison requires number')
     if op=='exists' and not isinstance(v,bool): error('exists requires boolean')
     if op=='in' and not isinstance(v,list): error('in requires array')
-def action(a):
+def action(a, version="1.0"):
+    if isinstance(a,dict) and a.get("op")=="subtract":
+        if version!="1.1" or set(a)!={"op","path","left","right"}: error("subtract requires schemaVersion 1.1 and exactly path, left, right")
+        path_ok(a["path"])
+        for o in (a["left"],a["right"]):
+            if not isinstance(o,dict): error("Subtraction operand must be object")
+            if set(o)=={"path"}: path_ok(o["path"])
+            elif set(o)=={"value"}: finite_number(o["value"],"Subtraction literal")
+            else: error("Subtraction operand requires exactly path or value")
+        return
     if not isinstance(a,dict) or a.get('op') not in {'set','copy','increment','append','delete'}: error('Unsupported action')
     path_ok(a.get('path'));op=a['op']
     allowed={'op','path'} | ({'value'} if op in {'set','append'} else {'from'} if op=='copy' else {'by'} if op=='increment' else set())
@@ -43,10 +117,22 @@ def action(a):
     if op in {'set','append'} and 'value' not in a: error('Action missing value')
     if op=='copy': path_ok(a.get('from'))
     if op=='increment' and (not isinstance(a.get('by',1),(int,float)) or isinstance(a.get('by',1),bool)): error('increment.by must be numeric')
+def wait_presentation(n):
+    if 'waitPresentation' not in n: return
+    p=n['waitPresentation']
+    if n.get('role')!='wait' or not isinstance(p,dict) or set(p)-{'intent','approveLabel','rejectLabel'} or p.get('intent') not in ('approval','event'): error('waitPresentation requires a wait node, intent approval/event, and only optional approveLabel/rejectLabel')
+    for key in ('approveLabel','rejectLabel'):
+        if key in p and (not isinstance(p[key],str) or not 1<=len(p[key])<=80 or not re.search(r'[^\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]',p[key])): error('waitPresentation.'+key+' must contain non-whitespace text, at most 80 Unicode code points')
+
 def validate(s):
     if not isinstance(s,dict): error('Spec must be an object')
     safe_json(s)
-    if s.get('schemaVersion')!='1.0': error('schemaVersion must be 1.0')
+    version=s.get('schemaVersion')
+    if version not in {'1.0','1.1'}: error('schemaVersion must be 1.0 or 1.1')
+    if version=='1.1': finite_tree(s)
+    if 'inputDomains' in s and version!='1.1': error('inputDomains requires schemaVersion 1.1')
+    domains=s.get('inputDomains',[])
+    validate_domains(domains)
     if not isinstance(s.get('title'),str) or not s['title'].strip(): error('title required')
     if 'description' in s and not isinstance(s['description'],str): error('description must be string')
     if not isinstance(s.get('nodes'),list) or not s['nodes']: error('nodes must be nonempty array')
@@ -55,17 +141,19 @@ def validate(s):
     for n in s['nodes']:
         if not isinstance(n,dict): error('node must be object')
         ident=n.get('id')
+        if ident == 'null': error("Native-reserved node ID 'null': choose a descriptive safe ID such as 'null_backend' and update its typed ID references; keep business values unchanged")
         if not isinstance(ident,str) or not SAFE_ID.fullmatch(ident) or ident in ids: error('Invalid/duplicate node ID: '+str(ident))
         ids.add(ident);nodes[ident]=n
         if 'parent' in n and (not isinstance(n['parent'],str) or not n['parent']): error(ident+': parent must be a nonempty container ID, or omitted')
         if n.get('role') not in ROLES: error(ident+': unsupported role')
+        wait_presentation(n)
         if not isinstance(n.get('label'),str) or not n['label']: error(ident+': label required')
         d=n.get('docs')
         if not isinstance(d,dict) or not isinstance(d.get('goal'),str) or not d['goal']: error(ident+': docs.goal required')
         for k in ('inputs','outputs','rules','permissions','construction','tests'):
             if k not in d: warnings.append(ident+': docs.'+k+' absent')
         if not isinstance(n.get('actions',[]),list): error(ident+': actions must be array')
-        for a in n.get('actions',[]): action(a)
+        for a in n.get('actions',[]): action(a, version)
         if n['role']=='container' and n.get('actions'): error(ident+': containers cannot execute actions')
         if 'status' in n and (n['role']!='terminal' or not isinstance(n['status'],str) or not n['status']): error(ident+': status only permitted on terminal')
     for n in nodes.values():
@@ -80,12 +168,13 @@ def validate(s):
     for e in s['edges']:
         if not isinstance(e,dict): error('edge must be object')
         ident=e.get('id')
+        if ident == 'null': error("Native-reserved edge ID 'null': choose a descriptive safe ID such as 'null_route' and update its typed ID references; keep business values unchanged")
         if not isinstance(ident,str) or not SAFE_ID.fullmatch(ident) or ident in ids: error('Invalid/duplicate edge ID: '+str(ident))
         ids.add(ident)
         if e.get('source') not in nodes or e.get('target') not in nodes: error(ident+': missing edge endpoint')
         if 'label' in e and not isinstance(e['label'],str): error(ident+': edge label must be string')
         if e.get('kind','normal') not in KINDS: error(ident+': invalid edge kind')
-        if 'when' in e: condition(e['when'])
+        if 'when' in e: condition(e['when'], version)
         if e.get('kind')=='data':
             if 'when' in e: error(ident+': data dependency cannot have executable condition')
             continue
@@ -110,6 +199,7 @@ def validate(s):
         for key in ('description','expected'):
             if key in x and not isinstance(x[key],str): error('scenario.'+key+' must be string')
         if not isinstance(x.get('title'),str) or not isinstance(x.get('context',{}),dict): error('Scenario title/context invalid')
+        if version=='1.1': check_domains({**s.get('context',{}),**x.get('context',{})},domains,x['id'])
         if x.get('entry',entry) not in nodes or x.get('entry',entry) in readonly or nodes[x.get('entry',entry)]['role']=='container': error('Invalid scenario entry')
     if not isinstance(s.get('maxSteps',500),int) or isinstance(s.get('maxSteps',500),bool) or not 1<=s.get('maxSteps',500)<=1000: error('maxSteps must be 1..1000')
     if not isinstance(s.get('acceptance',[]),list): error('acceptance must be array')
@@ -164,12 +254,35 @@ def drawio(s):
         cell=ET.SubElement(obj,'mxCell',edge='1',source=e['source'],target=e['target'],parent=common,style=style);ET.SubElement(cell,'mxGeometry',relative='1',attrib={'as':'geometry'})
     return ET.tostring(root,encoding='unicode',xml_declaration=True)
 
+def version_asset_urls(html,root):
+    """Version the template's local JS/CSS references from the copied output bytes.
+
+    This only rewrites quoted src/href attributes on script/link tags, not code,
+    resource contents, download links, or external URLs. The HTML still needs to
+    be refreshed by the browser; this does not configure hosting cache policy.
+    """
+    root=Path(root).resolve()
+    def tag(match):
+        def attribute(m):
+            url=urlsplit(html_entities.unescape(m['url']))
+            if url.scheme or url.netloc or not url.path.lower().endswith(('.js','.css')):return m[0]
+            path=(root/unquote(url.path)).resolve()
+            if not path.is_relative_to(root):error('Asset URL escapes output directory: '+m['url'])
+            if not path.is_file():error('Missing local asset: '+m['url'])
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            query=[(key,value) for key,value in parse_qsl(url.query,keep_blank_values=True) if key!='v']
+            query.append(('v',digest))
+            return m['prefix']+html_entities.escape(urlunsplit(('', '',url.path,urlencode(query),url.fragment)),quote=True)+m['quote']
+        return re.sub(r'''(?P<prefix>\b(?:src|href)\s*=\s*(?P<quote>["']))(?P<url>[^"']+)(?P=quote)''',attribute,match[0],flags=re.I)
+    return re.sub(r'<(?:script|link)\b[^>]*>',tag,html,flags=re.I)
+
 def build(s,out):
     warnings=validate(s);out=Path(out).resolve()
     if out==ROOT or ROOT in out.parents: error('Choose --out outside the skill folder (read-only installations supported)')
     if out.exists() and any(out.iterdir()): error('Output directory is nonempty; choose a new directory')
     out.mkdir(parents=True,exist_ok=True)
     shutil.copytree(ROOT/'assets',out,dirs_exist_ok=True)
+    html=out/'index.html';html.write_text(version_asset_urls(html.read_text(encoding='utf-8'),out),encoding='utf-8')
     dump(out/'spec.json',s);(out/'diagram.drawio').write_text(drawio(s),encoding='utf-8')
     handoff=out/'construction';handoff.mkdir();dump(handoff/'blueprint.json',s);shutil.copy2(out/'diagram.drawio',handoff/'diagram.drawio');shutil.copy2(ROOT/'references'/'spec.schema.json',handoff/'spec.schema.json');shutil.copy2(ROOT/'references'/'contract.md',handoff/'EXECUTION_CONTRACT.md');dump(handoff/'acceptance.json',s.get('acceptance',[]))
     index=['# '+s['title']+' · 节点施工索引','', '仅重建本地声明式模拟；真实外部操作需要另行实现和授权。','']

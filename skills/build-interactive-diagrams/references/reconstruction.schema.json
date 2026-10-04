@@ -1,0 +1,568 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Optional code reconstruction metadata 1.0 / 1.1",
+  "allOf": [
+    {
+      "$ref": "spec.schema.json"
+    }
+  ],
+  "type": "object",
+  "required": [
+    "sourceModel",
+    "acceptance"
+  ],
+  "properties": {
+    "sourceModel": {
+      "type": "object",
+      "required": [
+        "version",
+        "repositories",
+        "evidence",
+        "claims",
+        "boundaries",
+        "coverage"
+      ],
+      "properties": {
+        "version": {
+          "enum": [
+            "1.0",
+            "1.1"
+          ]
+        },
+        "repositories": {
+          "type": "array",
+          "items": {},
+          "minItems": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "minItems": 1
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/claim"
+          },
+          "minItems": 1
+        },
+        "boundaries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/boundary"
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "required": [
+            "scope",
+            "roots",
+            "limitations"
+          ],
+          "properties": {
+            "scope": {
+              "type": "string",
+              "minLength": 1
+            },
+            "roots": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/area"
+              },
+              "minItems": 1
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "1.0"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "repositories": {
+                "items": {
+                  "$ref": "#/$defs/repository"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "1.1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "repositories": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/repository"
+                    },
+                    {
+                      "$ref": "#/$defs/localSnapshot"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claimIds"
+        ],
+        "properties": {
+          "claimIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claimIds"
+        ],
+        "properties": {
+          "claimIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claimIds",
+          "relation"
+        ],
+        "properties": {
+          "claimIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+            },
+            "minItems": 1
+          },
+          "relation": {
+            "enum": [
+              "control",
+              "read",
+              "write",
+              "data"
+            ]
+          }
+        }
+      }
+    },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1
+    },
+    "sourcePresentation": {
+      "type": "object",
+      "required": [
+        "overviewRoot"
+      ],
+      "properties": {
+        "overviewRoot": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "projection": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "required": [
+        "id",
+        "url",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "required": [
+              "snapshot"
+            ]
+          }
+        ]
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository",
+        "path",
+        "lines",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "statement",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "observed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "boundary": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "description",
+        "claimIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "kind": {
+          "enum": [
+            "external-service",
+            "persistent-store",
+            "process",
+            "unresolved"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          }
+        },
+        "edgeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          }
+        },
+        "claimIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "area": {
+      "type": "object",
+      "required": [
+        "repository",
+        "path",
+        "disposition",
+        "reason"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "modeled",
+            "partial",
+            "summarized",
+            "excluded",
+            "external",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "modeled"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "nodeIds"
+            ],
+            "properties": {
+              "nodeIds": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "partial",
+                  "summarized"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "nodeIds"
+            ],
+            "properties": {
+              "nodeIds": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "localSnapshot": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "snapshot"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+        },
+        "kind": {
+          "const": "local-snapshot"
+        },
+        "snapshot": {
+          "type": "object",
+          "required": [
+            "format",
+            "scope",
+            "sha256",
+            "files"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "const": "source-snapshot-v1"
+            },
+            "scope": {
+              "const": "explicit-files"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "size",
+                  "sha256"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

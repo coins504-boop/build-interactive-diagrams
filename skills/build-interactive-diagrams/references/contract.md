@@ -1,4 +1,4 @@
-# 通用执行与施工约定 · 1.0
+# 通用执行与施工约定 · 1.0 / opt-in 1.1
 
 这是一个本地、确定性的声明式模拟协议，不是自动连接项目系统的工作流服务。生成器、网页和 Node 运行器使用同一个 spec；不从截图推测业务规则。
 
@@ -66,3 +66,65 @@ acceptance 项：id、scenario、mode(默认 normal)、decisions(默认空数组
 ## 已知限制
 
 任意业务领域可建模，但只覆盖上述声明式动作；真实业务必须另行实现/授权。不会从仓库自动推断完整业务语义。复杂布局和标签需人工视觉验收；大量节点/长标签不保证无需调整。回退保存完整快照，内存随轨迹近似平方增长，默认500步，1000上限不是性能承诺；达到预算会明确报错且不继续提交迁移。网页不持久化运行；导出原生图保存布局/原规格，不保存当前运行状态。浏览器本地 HTTP 服务只绑定127.0.0.1，无部署动作。建议桌面宽屏，移动端布局未充分验证。
+
+
+## Opt-in schema 1.1: bounded numeric decisions
+
+Use `schemaVersion: "1.1"` only when these additional capabilities are needed. Version 1.0 keeps its literal-condition and action semantics. New capabilities are rejected under 1.0; unsupported versions are rejected by the new engine. Existing old engines are not forward-compatible with 1.1. The Node command driver still validates through Python before execution and uses the same browser engine; build and native export preserve the selected version and declarations verbatim.
+
+### Input domains, before entry effects
+
+Optional top-level `inputDomains` is an array of unique context paths. Each rule has exactly one shape:
+- `{"path":"quantity","type":"integer","min":0,"max":100}`
+- `{"path":"measurement","type":"number","allowNull":true}`
+- `{"path":"policy","enum":[null,30,60]}`
+
+Numeric min/max are optional inclusive finite bounds, with min <= max. Integer inputs and bounds must be safe integers (absolute value <= 9007199254740991); booleans are never numbers. `allowNull` defaults to false. Enumerations are nonempty JSON-scalar lists, compared without coercion. Missing inputs always reject, even when null is allowed. Paths are relative to context, with the existing forbidden-segment rules. Domains apply globally to the merged input, including fields unused by a particular journey; conditional domains are unsupported. Explicit defaults belong in context. Scenario context retains shallow top-level override semantics.
+
+Python validates every authored merged scenario. The 1.1 engine rejects nonfinite numeric JSON before cloning and validates each selected merged input before entry actions. A failed start leaves the previous run, sequence, history and transition budget untouched. `Model domain error` identifies unsupported model input, not a simulated source exception or successful source outcome. Domain constraints apply to admitted input, not subsequent derived values. Structural JSON Schema cannot express ordered bounds, duplicate domain paths, finite runtime values, or all merged-input invariants; Python and runtime semantic checks remain mandatory.
+
+### Field-to-field numeric guards
+
+`{"field":"context.observed","op":"gte","valueField":"context.required"}`
+
+Exactly one of literal `value` or `valueField` is permitted. Field references are restricted to gt/gte/lt/lte and context paths on both sides. Both operands must exist and be finite numbers; missing/null/string/boolean/nonfinite values throw a model-domain error rather than evaluating false. Existing literal comparisons, equality, short-circuit all/any/not, fallback selection and ambiguity rules are unchanged.
+
+### Fixed-arity subtraction
+
+`{"op":"subtract","path":"elapsed","left":{"path":"current"},"right":{"path":"origin"}}`
+
+Each operand is exactly `{"path":"relative.context.path"}` or `{"value":1}`. No nested operands, expressions, coercion, callbacks or operators are supported. Both operands resolve before the destination is written, so aliases are deterministic. Inputs and the result must be finite. When both operands are integers, the result must be a safe integer. Fractional operations use IEEE-754 arithmetic, not exact decimal arithmetic or arbitrary-precision integers. Choose appropriately bounded inputs when exact integer source semantics matter. A failed subtraction or later action rolls back the entire current transition. Successful back/step replay retains the existing cumulative transition-budget behavior.
+
+These primitives do not implement parsing, dates, cryptography, routing, compression, arbitrary code or network access. Their injected dependency boundaries must remain named, scoped and honest.
+
+
+## Native cell ID compatibility correction (candidate 05)
+
+Node and edge IDs must not be the exact, case-sensitive string `null`. The pinned native XML codec uses that cache key for anonymous geometry: previously accepted output with this ID could stack-overflow during browser initialization. Validation rejects it before prepare/build; the JSON Schema agrees. Choose a descriptive ID such as `null_backend` or `null_route`, then update only typed references to that cell (entry, parent, endpoints, acceptance node/trace IDs, and source-model node/edge references). Do not rewrite context, guards, actions, source claims, or business values merely because they contain the word null. Separate claim/evidence/scenario IDs are not native cell IDs. Existing frozen artifacts remain immutable; recovery belongs in a new output directory.
+
+This deliberately narrows authoring compatibility only for previously unrenderable native cell IDs. Other syntactically valid names, including `undefined`, `constructor`, `prototype`, and `toString`, are not newly prohibited. Existing ID syntax already rejects root/layer IDs `0` and `1`. No runtime, vendor, prototype, or codec patch is installed. Run `tests/native-id-validation.test.py` and `tests/native-codec-id.test.js`; the latter executes actual unmodified vendored codec functions and preserves the old failure as an expected regression control. Browser rendering/interaction checks are a separate requirement.
+
+
+## Wait presentation: approval versus external event
+
+Optional `waitPresentation` is display metadata on a `role: "wait"` node, in schema 1.0 or 1.1. Omit it for the existing human-approval wording. If provided, it requires `intent: "approval"` or `intent: "event"` and accepts only optional `approveLabel` and `rejectLabel` strings (1–80 Unicode code points, containing non-whitespace text). The schema, Python validator and JS runtime all reject invalid objects or use on other roles. Labels are rendered as text, never executable markup.
+
+An environment wait can use:
+
+```json
+"waitPresentation": {
+  "intent": "event",
+  "approveLabel": "模拟连接恢复",
+  "rejectLabel": "模拟请求取消"
+}
+```
+
+The event intent changes the native card, active explanation and live detail from “等待决定” to “等待事件”. Its shared controls always disclose that these are locally injected modeled events, without external monitoring. The default event buttons are “模拟事件到达并继续” and “模拟取消”. Keep that simulation meaning in custom labels; do not say that the page detected a real reconnection, timer expiry or service response. Put the actual source event, gating conditions, cancellation effects and uncertainty in `docs`. If several source events have different effects, model the necessary subsequent guards/nodes rather than pretending one button reconstructs them all.
+
+A genuine permission or review boundary keeps the default approval/rejection labels, or explicitly uses `{"intent":"approval"}` with suitable custom labels. Do not classify an environmental pause as approval just because the local player needs a click. Conversely, do not disguise a real authorization boundary as an environmental event.
+
+This does not introduce new decisions or actions. The first button still calls `decide("approve")`; the second calls `decide("reject")`. For an event wait, guard the modeled event/resume edge on `decision == "approve"` and the modeled cancellation edge on `decision == "reject"`. The rejection edge executes its authored target and effects; the global “结束本次” control only cancels local playback and is not a replacement for that modeled cancellation path. Acceptance cases retain `decisions: ["approve"]` or `["reject"]`. Include pending, resume and cancellation cases, and back/replay between event and approval nodes.
+
+The full field stays unchanged in blueprint/native `portableSpec` and exports. Back and replay use the current node's presentation, without storing or altering labels in history. Presentation metadata does not change runtime state, guards, effects, tokens, history, transition budgets or external authorization. It creates no timers, network listeners, subscriptions or real-system control. Old viewers do not know the new presentation field and may show approval defaults; rebuild and distribute the updated workspace when using event intent.
+
+Regression checks: `node tests/wait-presentation.test.js`, `python3 tests/wait-presentation.test.py`, and `node tests/presentation-controls.test.js`. The fixture `tests/fixtures/wait-intents.json` shows an injected environment resume/cancel followed by a separate human review. These are headless checks, not a browser visual verification claim.

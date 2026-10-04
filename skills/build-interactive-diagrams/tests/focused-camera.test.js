@@ -1,0 +1,15 @@
+/* Actual focused wheel handler and native pan-trigger contract on doubles, no browser gesture claim. */
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),listeners={},host={addEventListener:(name,fn)=>listeners[name]=fn,getBoundingClientRect:()=>({left:100,top:50})};
+class Graph{constructor(host){this.container=host;this.model={cells:{}};this.view={scale:.3,translate:{x:12,y:-20},currentRoot:null,scaleAndTranslate(n,x,y){this.scale=n;this.translate={x,y};}};this.panningHandler={};this.tooltipHandler={hide(){}};this.popupMenuHandler={setEnabled(){}};}isCellVisible(){return true}setEnabled(v){this.enabled=v}addMouseListener(x){this.mouseListener=x}}
+for(const name of ['setTooltips','setConnectable','setCellsEditable','setCellsMovable','setCellsSelectable','setPanning'])Graph.prototype[name]=function(v){this[name+'Value']=v};
+class Highlight{constructor(g){this.graph=g}hide(){}destroy(){}}
+const box={Graph,mxCellHighlight:Highlight,console};vm.runInNewContext(fs.readFileSync(path.join(root,'assets/native-detail.js'),'utf8'),box);const detail=new box.ProbeNativeDetail.NativeDetail(host),g=detail.graph;
+assert.equal(g.setPanningValue,true);assert.equal(g.panningHandler.useLeftButtonForPanning,true);assert.equal(g.enabled,false,'read-only graph still has explicitly enabled panning');
+let events=0;
+function wheel(deltaY){const x=260,y=180,before={x:x/g.view.scale-g.view.translate.x,y:y/g.view.scale-g.view.translate.y};listeners.wheel({clientX:x+100,clientY:y+50,deltaY,preventDefault(){events++}});assert.ok(Math.abs(x/g.view.scale-g.view.translate.x-before.x)<1e-9);assert.ok(Math.abs(y/g.view.scale-g.view.translate.y-before.y)<1e-9);}
+wheel(-900);assert.ok(g.view.scale>1,'fit-scale detail reaches readable zoom');wheel(-10000);assert.equal(g.view.scale,2);wheel(10000);assert.equal(g.view.scale,.08);assert.equal(events,3);
+const vendor=fs.readFileSync(path.join(root,'assets/vendor/viewer-static.min.js'),'utf8');const marker='mxPanningHandler.prototype.isPanningTrigger=function',start=vendor.indexOf(marker),end=vendor.indexOf('mxPanningHandler.prototype.',start+marker.length);
+box.mxPanningHandler=function(){};box.mxEvent={isLeftMouseButton:e=>e.button===0,isControlDown:e=>e.ctrlKey,isShiftDown:e=>e.shiftKey,isPopupTrigger:()=>false};vm.runInNewContext(vendor.slice(start,end),box);const pan=new box.mxPanningHandler;Object.assign(pan,g.panningHandler);
+assert.equal(pan.isPanningTrigger({getEvent:()=>({button:0}),getState:()=>null}),true,'blank left drag starts native pan');assert.equal(pan.isPanningTrigger({getEvent:()=>({button:0}),getState:()=>({cell:{}})}),false,'cell click is not silently repurposed as pan');
+console.log(JSON.stringify({ok:true,wheelRange:[.08,2],pointerAnchored:true,leftButtonBlankPanTrigger:true,evidence:'Actual NativeDetail constructor/wheel callback and vendored native pan-trigger function; synthetic host and graph. End-to-end browser pan/zoom remains pending.'}));

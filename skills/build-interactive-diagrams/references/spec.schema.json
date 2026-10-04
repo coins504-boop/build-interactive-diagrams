@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Portable interactive diagram specification 1.0",
+  "title": "Portable interactive diagram specification 1.0 / opt-in 1.1",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -12,7 +12,10 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "enum": [
+        "1.0",
+        "1.1"
+      ]
     },
     "title": {
       "type": "string",
@@ -145,6 +148,12 @@
           }
         }
       }
+    },
+    "inputDomains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/inputDomain"
+      }
     }
   },
   "$defs": {
@@ -220,6 +229,33 @@
               "$ref": "#/$defs/condition"
             }
           },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string",
+              "pattern": "^context\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            },
+            "op": {
+              "enum": [
+                "gt",
+                "gte",
+                "lt",
+                "lte"
+              ]
+            },
+            "valueField": {
+              "type": "string",
+              "pattern": "^context\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "field",
+            "op",
+            "valueField"
+          ],
           "additionalProperties": false
         }
       ]
@@ -322,6 +358,32 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "subtract"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            },
+            "left": {
+              "$ref": "#/$defs/numericOperand"
+            },
+            "right": {
+              "$ref": "#/$defs/numericOperand"
+            }
+          },
+          "required": [
+            "op",
+            "path",
+            "left",
+            "right"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -336,7 +398,11 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$",
+          "not": {
+            "const": "null"
+          },
+          "description": "The literal cell ID 'null' is reserved by the native XML codec. Choose a descriptive safe ID and update typed references; business values are unaffected."
         },
         "label": {
           "type": "string",
@@ -379,8 +445,27 @@
         "status": {
           "type": "string",
           "minLength": 1
+        },
+        "waitPresentation": {
+          "$ref": "#/$defs/waitPresentation"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "waitPresentation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "role": {
+                "const": "wait"
+              }
+            }
+          }
+        }
+      ]
     },
     "edge": {
       "type": "object",
@@ -392,7 +477,11 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$"
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$",
+          "not": {
+            "const": "null"
+          },
+          "description": "The literal cell ID 'null' is reserved by the native XML codec. Choose a descriptive safe ID and update typed references; business values are unaffected."
         },
         "source": {
           "type": "string",
@@ -419,6 +508,367 @@
           "$ref": "#/$defs/condition"
         }
       }
+    },
+    "legacyCondition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "field",
+            "op",
+            "value"
+          ],
+          "properties": {
+            "field": {
+              "type": "string",
+              "pattern": "^(mode|decision|context\\..+)$"
+            },
+            "op": {
+              "enum": [
+                "eq",
+                "ne",
+                "gt",
+                "gte",
+                "lt",
+                "lte",
+                "exists",
+                "in"
+              ]
+            },
+            "value": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "all"
+          ],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/legacyCondition"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "any"
+          ],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/legacyCondition"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "not"
+          ],
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/legacyCondition"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "legacyAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path",
+            "value"
+          ],
+          "properties": {
+            "op": {
+              "const": "set"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path",
+            "from"
+          ],
+          "properties": {
+            "op": {
+              "const": "copy"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "from": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path"
+          ],
+          "properties": {
+            "op": {
+              "const": "increment"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "by": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path",
+            "value"
+          ],
+          "properties": {
+            "op": {
+              "const": "append"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path"
+          ],
+          "properties": {
+            "op": {
+              "const": "delete"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "numericOperand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "inputDomain": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            },
+            "type": {
+              "enum": [
+                "number",
+                "integer"
+              ]
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "allowNull": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path",
+            "type"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "min": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+(?:\\.(?!(?:__proto__|prototype|constructor)(?:\\.|(?![\\s\\S])))[^.]+)*(?![\\s\\S])"
+            },
+            "enum": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          },
+          "required": [
+            "path",
+            "enum"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "waitPresentation": {
+      "type": "object",
+      "required": [
+        "intent"
+      ],
+      "properties": {
+        "intent": {
+          "enum": [
+            "approval",
+            "event"
+          ]
+        },
+        "approveLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+        },
+        "rejectLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Display-only wait intent and labels. Existing approve/reject decision tokens and execution semantics are unchanged. Event controls inject local modeled events; they do not monitor external systems."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.0"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "inputDomains"
+          ]
+        },
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "actions": {
+                  "items": {
+                    "$ref": "#/$defs/legacyAction"
+                  }
+                }
+              }
+            }
+          },
+          "edges": {
+            "items": {
+              "properties": {
+                "when": {
+                  "$ref": "#/$defs/legacyCondition"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -24,6 +24,72 @@ class PackageTests(unittest.TestCase):
    self.assertEqual((ROOT/'assets/vendor/viewer-static.min.js').read_bytes(),(output/'vendor/viewer-static.min.js').read_bytes())
    self.assertTrue((output/'construction.zip').is_file());self.assertTrue((output/'licenses/THIRD-PARTY-NOTICES.txt').is_file())
    with self.assertRaises(ValueError):driver.build(spec,output)
+ def test_generated_ui_is_project_neutral(self):
+  # Inspect freshly built output, not only the source template: a build hook must
+  # not reintroduce navigation to a historical demo or a root-hosted route.
+  from html.parser import HTMLParser
+  class Elements(HTMLParser):
+   def __init__(self): super().__init__();self.elements=[]
+   def handle_starttag(self,tag,attrs): self.elements.append((tag,dict(attrs)))
+  for fixture in sorted((ROOT/'examples').glob('*.json')):
+   with self.subTest(fixture=fixture.name),tempfile.TemporaryDirectory(prefix='neutral-diagram-') as tmp:
+    output=pathlib.Path(tmp)/'output';driver.build(json.loads(fixture.read_text()),output)
+    html=(output/'index.html').read_text();document=Elements();document.feed(html)
+    for tag,attrs in document.elements:
+     if tag=='a':
+      href=attrs.get('href','')
+      self.assertFalse(href.startswith(('/', 'http:', 'https:', '//')),href)
+      self.assertTrue((output/href.split('?',1)[0].split('#',1)[0]).is_file(),href)
+    controls={attrs.get('id'):attrs for tag,attrs in document.elements if tag=='button'}
+    for ident in ('fit','focus','canvas-focus','connection-all'):
+     self.assertIn(ident,controls)
+    self.assertEqual(controls['canvas-focus']['aria-pressed'],'false')
+    self.assertEqual(controls['connection-all']['aria-pressed'],'false')
+    for file in output.rglob('*'):
+     if file.is_file() and file.suffix in {'.html','.js','.css'}:
+      content=file.read_text()
+      self.assertNotIn('/code-reconstruction-lab/',content,str(file.relative_to(output)))
+      self.assertNotIn('对比旧版',content,str(file.relative_to(output)))
+ def test_release_inventory_has_no_untracked_files(self):
+  tracked=set(json.loads((ROOT/'MANIFEST.json').read_text())['files'])|{'MANIFEST.json'}
+  actual={str(p.relative_to(ROOT)) for p in ROOT.rglob('*') if p.is_file()}
+  self.assertEqual(actual,tracked,'Package must contain exactly its declared resources')
+ def test_generated_asset_urls_match_bytes_and_change_with_assets(self):
+  from html.parser import HTMLParser
+  from urllib.parse import parse_qs, urlsplit
+  class Assets(HTMLParser):
+   def __init__(self,html):super().__init__();self.urls=[];self.feed(html)
+   def handle_starttag(self,tag,attrs):
+    attrs=dict(attrs)
+    if tag in {'script','link'}:
+     url=attrs.get('src',attrs.get('href',''))
+     if urlsplit(url).path.endswith(('.js','.css')):self.urls.append(url)
+  with tempfile.TemporaryDirectory(prefix='asset-digests-') as tmp:
+   output=pathlib.Path(tmp)/'output';driver.build(BASE,output)
+   html=(output/'index.html').read_text();urls=Assets(html).urls
+   self.assertGreaterEqual(len(urls),11)
+   for value in urls:
+    url=urlsplit(value)
+    self.assertEqual(parse_qs(url.query)['v'],[hashlib.sha256((output/url.path).read_bytes()).hexdigest()])
+   # Same-path replacement must change the generated URL. The template carries
+   # no manually maintained versions; an old query is replaced, not appended.
+   template=(ROOT/'assets/index.html').read_text()
+   self.assertEqual(driver.version_asset_urls(html,output),html)
+   for asset in ('engine.js','app.js','style.css','vendor/viewer-static.min.js'):
+    file=output/asset;before=driver.version_asset_urls(template,output)
+    file.write_bytes(file.read_bytes()+b'\n/* regression mutation */\n')
+    after=driver.version_asset_urls(template,output)
+    self.assertNotEqual(before,after,asset)
+    fresh=next(url for url in Assets(after).urls if urlsplit(url).path==asset)
+    self.assertEqual(parse_qs(urlsplit(fresh).query)['v'],[hashlib.sha256(file.read_bytes()).hexdigest()])
+   extra='<script src="engine.js?lang=zh&amp;empty=&amp;v=stale#entry"></script><a href="construction.zip">Download</a>'
+   versioned=driver.version_asset_urls(extra,output);url=urlsplit(Assets(versioned).urls[0])
+   self.assertEqual(parse_qs(url.query,keep_blank_values=True),{'lang':['zh'],'empty':[''],'v':[hashlib.sha256((output/'engine.js').read_bytes()).hexdigest()]})
+   self.assertEqual(url.fragment,'entry');self.assertIn('<a href="construction.zip">',versioned)
+   external='<script src="https://example.invalid/app.js?v=original"></script>'
+   self.assertEqual(driver.version_asset_urls(external,output),external)
+   for invalid in ('missing.js','../outside.js','%2e%2e/outside.css'):
+    with self.assertRaises(ValueError):driver.version_asset_urls('<script src="'+invalid+'"></script>',output)
  def test_output_cannot_target_installation(self):
   with self.assertRaises(ValueError):driver.build(BASE,ROOT/'forbidden-output')
  def test_declared_assets_exist(self):

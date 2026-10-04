@@ -1,0 +1,278 @@
+{
+  "schemaVersion": "1.0",
+  "title": "事件等待与审核等待测试",
+  "entry": "begin",
+  "context": {
+    "waitEntries": 0
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "role": "container",
+      "label": "请求流程",
+      "docs": {
+        "goal": "本地模型，按钮注入事件或决定",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "flow",
+      "parent": "root",
+      "role": "container",
+      "label": "等待与审核",
+      "docs": {
+        "goal": "分开说明环境事件与人的审核",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "begin",
+      "parent": "flow",
+      "role": "source",
+      "label": "开始请求",
+      "docs": {
+        "goal": "接收模拟请求",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "connection",
+      "parent": "flow",
+      "role": "wait",
+      "label": "等待连接恢复",
+      "docs": {
+        "goal": "连接恢复后继续；调用者也可取消请求",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      },
+      "waitPresentation": {
+        "intent": "event",
+        "approveLabel": "模拟连接恢复",
+        "rejectLabel": "模拟请求取消"
+      },
+      "actions": [
+        {
+          "op": "increment",
+          "path": "waitEntries"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "parent": "flow",
+      "role": "wait",
+      "label": "审核请求",
+      "docs": {
+        "goal": "审核者批准或拒绝；本页只演示该决定",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "done",
+      "parent": "flow",
+      "role": "terminal",
+      "label": "请求完成",
+      "status": "completed",
+      "docs": {
+        "goal": "获得批准后完成模拟请求",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "cancelled",
+      "parent": "flow",
+      "role": "terminal",
+      "label": "请求已取消",
+      "status": "cancelled",
+      "docs": {
+        "goal": "模拟调用者取消请求",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    },
+    {
+      "id": "denied",
+      "parent": "flow",
+      "role": "terminal",
+      "label": "请求被拒绝",
+      "status": "rejected",
+      "docs": {
+        "goal": "审核者拒绝请求",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [],
+        "construction": [],
+        "tests": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "start_wait",
+      "source": "begin",
+      "target": "connection",
+      "label": "start_wait",
+      "kind": "normal"
+    },
+    {
+      "id": "resume_event",
+      "source": "connection",
+      "target": "review",
+      "label": "resume_event",
+      "kind": "resume",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "approve"
+      }
+    },
+    {
+      "id": "cancel_event",
+      "source": "connection",
+      "target": "cancelled",
+      "label": "cancel_event",
+      "kind": "reject",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "reject"
+      }
+    },
+    {
+      "id": "approve_request",
+      "source": "review",
+      "target": "done",
+      "label": "approve_request",
+      "kind": "resume",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "approve"
+      }
+    },
+    {
+      "id": "deny_request",
+      "source": "review",
+      "target": "denied",
+      "label": "deny_request",
+      "kind": "reject",
+      "when": {
+        "field": "decision",
+        "op": "eq",
+        "value": "reject"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "request",
+      "title": "请求等待事件"
+    },
+    {
+      "id": "approval",
+      "title": "直接审核",
+      "entry": "review"
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "pending_event",
+      "scenario": "request",
+      "expect": {
+        "status": "waiting",
+        "nodeId": "connection"
+      }
+    },
+    {
+      "id": "pending_review",
+      "scenario": "request",
+      "decisions": [
+        "approve"
+      ],
+      "expect": {
+        "status": "waiting",
+        "nodeId": "review"
+      }
+    },
+    {
+      "id": "cancelled_event",
+      "scenario": "request",
+      "decisions": [
+        "reject"
+      ],
+      "expect": {
+        "status": "cancelled",
+        "nodeId": "cancelled"
+      }
+    },
+    {
+      "id": "approved_request",
+      "scenario": "request",
+      "decisions": [
+        "approve",
+        "approve"
+      ],
+      "expect": {
+        "status": "completed",
+        "nodeId": "done"
+      }
+    },
+    {
+      "id": "denied_request",
+      "scenario": "request",
+      "decisions": [
+        "approve",
+        "reject"
+      ],
+      "expect": {
+        "status": "rejected",
+        "nodeId": "denied"
+      }
+    },
+    {
+      "id": "direct_approval",
+      "scenario": "approval",
+      "decisions": [
+        "approve"
+      ],
+      "expect": {
+        "status": "completed",
+        "nodeId": "done"
+      }
+    }
+  ]
+}

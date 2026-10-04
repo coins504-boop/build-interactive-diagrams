@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Focused label containment fixtures",
+  "description": "Display-only layout experiment; no application or service execution",
+  "entry": "check_0",
+  "context": {},
+  "maxSteps": 30,
+  "nodes": [
+    {
+      "id": "area",
+      "label": "Independent label checks",
+      "role": "container",
+      "docs": {
+        "goal": "Independent label checks",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      }
+    },
+    {
+      "id": "check_0",
+      "label": "Ready?",
+      "role": "router",
+      "docs": {
+        "goal": "Ready?",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_1",
+      "label": "检查返回结果是否提供了值",
+      "role": "router",
+      "docs": {
+        "goal": "检查返回结果是否提供了值",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_2",
+      "label": "只更新仍在关注这份数据的使用方",
+      "role": "router",
+      "docs": {
+        "goal": "只更新仍在关注这份数据的使用方",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_3",
+      "label": "Continue after every subscribed observer has received the update?",
+      "role": "router",
+      "docs": {
+        "goal": "Continue after every subscribed observer has received the update?",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_4",
+      "label": "isPossiblyUndefinedCallbackResultAccepted",
+      "role": "router",
+      "docs": {
+        "goal": "isPossiblyUndefinedCallbackResultAccepted",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_5",
+      "label": "保留显式\n换行和空白  文本",
+      "role": "router",
+      "docs": {
+        "goal": "保留显式\n换行和空白  文本",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "check_6",
+      "label": "👩🏽‍💻 检查 👨‍👩‍👧‍👦 返回的结果",
+      "role": "router",
+      "docs": {
+        "goal": "👩🏽‍💻 检查 👨‍👩‍👧‍👦 返回的结果",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area"
+    },
+    {
+      "id": "done",
+      "label": "Checks complete",
+      "role": "terminal",
+      "docs": {
+        "goal": "Checks complete",
+        "inputs": [],
+        "outputs": [],
+        "rules": [],
+        "permissions": [
+          "Local explanatory fixture only"
+        ],
+        "construction": "No upstream execution",
+        "tests": [
+          "All declared routes preserve native identities"
+        ]
+      },
+      "parent": "area",
+      "status": "completed"
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow_0",
+      "source": "check_0",
+      "target": "check_1",
+      "label": "next"
+    },
+    {
+      "id": "flow_1",
+      "source": "check_1",
+      "target": "check_2",
+      "label": "next"
+    },
+    {
+      "id": "flow_2",
+      "source": "check_2",
+      "target": "check_3",
+      "label": "next"
+    },
+    {
+      "id": "flow_3",
+      "source": "check_3",
+      "target": "check_4",
+      "label": "next"
+    },
+    {
+      "id": "flow_4",
+      "source": "check_4",
+      "target": "check_5",
+      "label": "next"
+    },
+    {
+      "id": "flow_5",
+      "source": "check_5",
+      "target": "check_6",
+      "label": "next"
+    },
+    {
+      "id": "flow_6",
+      "source": "check_6",
+      "target": "done",
+      "label": "next"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "complete",
+      "title": "Visit every text fixture"
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "all-checks",
+      "scenario": "complete",
+      "expect": {
+        "status": "completed",
+        "nodeId": "done",
+        "traceIncludes": [
+          "check_0",
+          "check_1",
+          "check_2",
+          "check_3",
+          "check_4",
+          "check_5",
+          "check_6"
+        ]
+      }
+    }
+  ]
+}

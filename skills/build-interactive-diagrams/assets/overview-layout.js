@@ -4,7 +4,7 @@ function compose(graph){
  const model=graph.model,root=graph.getDefaultParent(),vertices=graph.getChildVertices(root),geometry=c=>model.getGeometry(c);
  const attribute=(c,key)=>c&&c.value&&c.value.getAttribute?c.value.getAttribute(key):'',role=c=>attribute(c,'role');
  if(vertices.filter(c=>role(c)==='container').length<2)return;
- const stable=(a,b)=>String(a.id).localeCompare(String(b.id)),edges=Object.values(model.cells).filter(c=>c.edge);
+ const stable=(a,b)=>String(a.id).localeCompare(String(b.id)),edges=Object.values(model.cells).filter(c=>c.edge&&c.value.getAttribute('presentationOnly')!=='true');
  const owner=cell=>{let c=cell;while(c&&model.getParent(c)!==root)c=model.getParent(c);return c;};
  const links=edges.map(edge=>({edge,from:owner(edge.source),to:owner(edge.target),kind:attribute(edge,'kind')})).filter(e=>e.from&&e.to&&e.from!==e.to);
  const inputs=vertices.filter(c=>role(c)==='source').sort(stable),outputs=vertices.filter(c=>role(c)==='terminal').sort(stable);

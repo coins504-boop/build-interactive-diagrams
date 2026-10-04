@@ -1,62 +1,47 @@
-# 验证与边界 · v1.3.0
+# Optional skill maintenance and deeper validation
 
-## 从独立副本复现
+Read this for a package change, release verification, suspected reusable regression, or an explicitly deeper review. It is not a per-diagram checklist. Ordinary diagrams use SKILL.md; source authoring still applies its concise source/evidence/admission gates and actual byte-bound build receipt.
 
-仅需 Python 3.10+ 和 Node.js 18+，不需要安装依赖、联网、浏览器或相邻项目。此轮运行环境为 Python 3.12.14 / Node.js 24.19.0；未逐一验证最低版本。
+## Select tests by the changed boundary
 
-在技能目录运行：
+From the skill directory, with Python 3.10+ and Node.js 18+:
 
-```sh
-node tests/runtime.test.js
-python3 tests/package.test.py
-python3 tests/presentation.test.py
-node tests/layout-stress.test.js
-```
+- Core/runtime: `node tests/runtime.test.js`; `node tests/route-identity.test.js`; `python3 tests/package.test.py`
+- Numeric/nullable/IDs: `node tests/numeric-capabilities.test.js`; `python3 tests/numeric-validation.test.py`; `python3 tests/parity-boundaries.test.py`; `node tests/nullable-authoring.test.js`; `python3 tests/native-id-validation.test.py`; `node tests/native-codec-id.test.js`
+- Source metadata/projection: `python3 tests/source-evidence.test.py`; `python3 tests/local-snapshot.test.py`; `node tests/local-snapshot-presentation.test.js`; `python3 tests/coverage-review.test.py`; `python3 tests/model-consistency.test.py`; `python3 -I -S tests/reconstruction-pipeline.test.py`
+- Source presentation: `node tests/source-controls.test.js`; `node tests/source-presentation.test.js`; `node tests/source-visibility.test.js /path/to/prepared-spec.json`; `node tests/focused-connections.test.js /path/to/prepared-spec.json`; `node tests/focused-camera.test.js`
+- UI/contracts/layout: `python3 tests/presentation.test.py`; `node tests/contract-reading.test.js`; `node tests/wait-presentation.test.js`; `python3 tests/wait-presentation.test.py`; `node tests/terminal-presentation.test.js`; `node tests/router-label-containment.test.js`; `node tests/layout-stress.test.js`
+- Source-review teaching fixtures: `node tests/semantic-probes.test.js`. Twelve bounded patterns and broken-model controls demonstrate probe sensitivity; they do not check arbitrary source models
 
-也可以从其他工作目录用绝对路径运行。测试只使用两个随包规格、一个重命名副本和确定性生成的压力规格；不读取私有基线或相邻项目。构建结果与压力报告写入临时目录，不修改安装目录。`LAYOUT_STRESS_REPORT_DIR` 可指定报告目录；`node tests/layout-stress.test.js 600` 只运行一档。
+presentation.test.py already calls presentation-controls, layout-packing and lighting tests. Repeating their entry points is unnecessary unless diagnosing them. native-layout-runtime.js and generate-layout-stress.js are helpers used by those tests; preserve them. Some tests accept an optional frozen baseline only for historical regression reproduction; normal portable checks do not require adjacent projects.
 
-## 各层实际覆盖
+Git-source maintenance fixtures require local Git. Already installed jsonschema enables an extra comparison; absence must be reported as that layer skipped, never trigger installation. Broken installed dependencies are not absence. `python3 -S tests/native-id-validation.test.py` exercises its no-site-packages path. Node tests use PYTHON when set or python3. Minimum interpreter versions are requirements, not a claim all versions were tested.
 
-- **执行引擎**：两个领域共 12 项业务验收；真实轨迹边、后退重播、取消、重开、等待批准/拒绝、歧义与缺失出边、异常回滚、输入克隆、总迁移预算与标签转义
-- **打包与原生数据**：无效规格拒绝、作者文档保真、完整规格嵌入原生图、真实父子关系和边端点、guard/动作保留、发布清单与施工文件校验和、非空输出及安装目录内输出拒绝、入口资产与 viewer 字节保真
-- **呈现单元测试**：运行实际主题、面板、发光装饰器和提取的计时器/详情函数；使用模型、DOM/SVG、计时器替身。覆盖 32 种面板组合、专注状态恢复、原控件/回调身份、隐藏后恢复最新局部步骤，以及 0.08–5 倍变换下光芯与光晕的尺寸约束。20 组矩形样本检查实际概览排布器的非重叠、幂等和内部几何保留
-- **冻结边界**：测试锁定执行引擎、两个运行/生成脚本、schema、执行合同和 viewer 的六份 SHA-256。许可证及第三方 viewer 原字节随包保留
+## What the tests establish
 
-`presentation.test.py` 同时调用独立的面板、矩形排布和发光测试；不必再重复执行这些入口。上述替身测试不证明字体度量、浏览器渲染、点击命中或视觉可读性。
+- Runtime: authored acceptance, actions/guards, waits/cancel/back/restart, transition budgets and error behavior on included fixtures
+- Package/pipeline: actual file hashes, model/native/blueprint/ZIP preservation, honest projection, fail-closed stages, source identity and current raw-input binding. See [pipeline-integrity.md](pipeline-integrity.md)
+- Presentation: actual helpers with headless native models, DOM/SVG/timer doubles and synthetic measurements. These do not prove browser fonts, pixels, clicking or readability
+- Semantic examples: source-review patterns and valid broken-model controls under their declared bounded assumptions, not upstream execution or production equivalence
 
-## 官方原生布局压力测试
+## Actual browser and scale checks
 
-`native-layout-runtime.js` 从随包 viewer 加载官方 mxGraphModel、mxHierarchicalLayout、几何与折叠/边界方法。图形 facade 无渲染器；卡片尺寸为确定性的测试输入。测试执行实际 adaptive/overview 模块和 app 布局函数；卡片字体测量由上述固定尺寸代替，需要浏览器状态的边标签布局设为无操作。没有替代的层级排序算法。
+After presentation/engine changes, inspect independent panels, focus restoration, original controls with inspector hidden, live detail restoration, pause/step/back, wait resume/reject, cancel/restart, route identity, and drag/pan/zoom with no completion camera jump. Check useful wide/smaller viewports and native export. Keep visual evidence separate from unit-test passes.
 
-三个合成规格包含大小不等的组、长链、宽分叉/汇合、条件平行边、跨组连接、一次性失败循环和等待决定：
+Synthetic native layout stress covers 300/600/1000 total-node fixtures with real vendored mxGraphModel/layout algorithms and fixed card dimensions. Run a selected size with `node tests/layout-stress.test.js 600`; LAYOUT_STRESS_REPORT_DIR chooses report output. These measure headless geometry only, not browser load/interaction or arbitrary real projects. No global crossing-minimization, long-label readability, 1000 direct-sibling, arbitrary-depth or browser performance guarantee exists. Large drawings need hierarchy and useful zoom.
 
-| 总节点（含容器） | 边 | 容器 | 顶层区域 | 单容器最多直接子节点 |
-| --- | --- | --- | --- | --- |
-| 300 | 468 | 46 | 8 | 29 |
-| 600 | 897 | 68 | 12 | 33 |
-| 1000 | 1460 | 91 | 16 | 38 |
+The player retains full back snapshots, so memory grows with history; total transition budget defaults to 500, caps at 1000, back does not refund it and restart resets it. Exhaustion is failure, not success. Generated asset URL hashes require rebuilding after asset edits; they cannot force a stale HTML document or hosting cache to refresh. Assets directory modes are copied, so explicitly read-only 0555 directories can make output unwritable.
 
-三档均为 **3 层容器、4 层顶点（含叶节点）**；根层最多 65 个直接顶点。每档有 28 项实际执行验收，共 84 项；分别测试嵌套折叠与全展开，共六种显示状态。
+## Deeper source review, only within agreed scope
 
-每种状态检查：所有容器均试算官方横/纵两个方向；选中候选有效；同级矩形不重叠、子节点在父边界内、坐标与路由点有限；真实 ID、层级、端点、动作/条件元数据与折叠状态不变；模型事务平衡，视图验证批量完成。重复布局的可见矩形和路由点一致；原生折叠保存的 `alternateBounds.x/y` 首次重排后可能改变，第三次完整几何必须与第二次一致。
+For a requested audit or a material unresolved semantic interaction, expand the source-first branch/default/owner inventory and select distinguishing boundary/interleaving probes. Read only relevant [source-review-details.md](source-review-details.md) sections. Preserve source-only reviewer findings before model comparison; record missing independence. Keep computed domain tests, injected-result replay, summaries, metadata integrity and actual interface review separate. Do not treat a larger fixture total or repeated review as universal certification.
 
-报告包含本机耗时、方向、边界、几何摘要与所用 viewer 哈希。耗时仅包含无界面几何运算，**不是浏览器首屏或交互性能**。要构建真实压力预览，先运行：
+Release history and project research are intentionally outside this portable skill. Consult a release's external report/manifest for exact byte-bound evidence and actual test environment; this reference gives reusable procedures, not a historical pass claim.
 
-```sh
-node tests/generate-layout-stress.js /你的可写目录
-python3 scripts/diagram.py build /你的可写目录/stress-600.json --out /另一可写目录/preview
-```
+## Browser native-export maintenance
 
-生成器省略输出目录时写入临时目录，并打印文件路径。
+The browser export preserves fitted router display by writing a literal display alias only to a cloned native model. Canonical labels/docs/spec and native geometry remain unchanged. Export never measures, wraps or resizes; a missing/stale fit fails before download. Apply the default theme and relayout before retrying. Run `node tests/native-export.test.js [existing-spec.json ...]` for lifecycle, literal, roundtrip and fail-closed controls; the test helper uses synthetic measurements and is not loaded by the app.
 
-## 浏览器检查与未覆盖项
+Actual-browser acceptance requires downloading from the exact app bytes and loading those exact XML bytes in the pinned default embedded viewer without app theme/label overrides. Check readable-zoom long labels, literal text, canonical identity and default plain-SVG dispatch. Font loading/cache/fallback, whitespace/CR appearance and extreme labels remain qualified.
 
-本套自动化没有浏览器截图或操作测试；发布清理不能算作重新完成 GUI 验收。此前 600 节点真实预览已出现较慢的浏览器操作，不承诺大图快速加载或流畅交互。
-
-新增领域交付前，应在目标浏览器检查加载/缩放、折叠与局部视图、播放/暂停/单步/后退、等待批准/拒绝、面板恢复、拖动后的连线连接，以及导出后的原生图。
-
-- 矩形不重叠不等于边、箭头或文字没有交叉/遮挡；没有全局最少交叉或任意长标签可读保证
-- 没有验证 1000 个直接可见同级节点、任意嵌套深度、任意区域数量或任意复杂图。1000 节点全展开样本约 18994 × 12464 图单位，压进一屏不可读；需要分层、局部查看和缩放
-- 生成器将安装包 assets 目录的权限复制到输出；显式设为 0555 的源目录会使输出不可写、构建失败。请使用正常权限的解压/克隆副本。此情况与保留 0755 权限的只读挂载不同；后者本轮未单独测试
-- 回退保留完整快照，内存随轨迹增长；默认总迁移预算 500、硬上限 1000，后退不返还预算，重开重置。预算耗尽是明确错误，不算成功
-- 未证明所有浏览器/屏幕/操作系统、完整无障碍、生产可靠性、真实外部适配器或数据库并发事务。界面以桌面宽屏为主；每个领域仍需自己的业务验收与视觉检查
+This remedy does not change fresh-build `.drawio` or construction ZIP native visuals, or certify full-editor editing/save/reimport; alias editing in a full editor can overwrite a canonical label. Existing candidate22 layout behavior and dense-caption limitations remain. No projected-caption solver/lane-reservation feature is included.

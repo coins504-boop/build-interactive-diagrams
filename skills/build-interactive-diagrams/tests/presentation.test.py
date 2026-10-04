@@ -19,12 +19,15 @@ from xml.etree import ElementTree as ET
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
+# Candidate-15 wait metadata admission is separately pinned. Execution method bodies
+# and old-spec native/runtime parity are checked against candidate-14 in its report.
+# These hashes are a regression pin, not an independent review or promotion claim.
 BASELINE_HASHES = {
-    'assets/engine.js': '873c98c3b89dde958a3965dd7d36d30edca3963f488d978101bdcc7b555c4f56',
+    'assets/engine.js': '804da54b1f1c0aeec8cc67a7eb5842ddba5cb9c75742d5d06af0ba84962ca781',
     'scripts/run.js': 'd1da92fcc920b4a591f6834c2cb782f4b1901e395bcad1701bae6c92b246b903',
-    'scripts/diagram.py': 'c194783528df705d5655b235303a4fbe092d3324a5f714ce993a7007aae34988',
-    'references/spec.schema.json': 'a30b3e268e304af3d8c3fa6114e12853e4fff3751b3ba4ce4a41c832a2184f1f',
-    'references/contract.md': 'f49ae21978cd8c4ddce8db63095720fa643c8025a22680dade0da9be1b84241a',
+    'scripts/diagram.py': '5bf6f1fb974f71c3e18b8855dc751c20c4222fc773f127ca7fb14529ba5ab506',
+    'references/spec.schema.json': '0de348de6228c87dc93b0488ccdb465546f0fd9fec75e95c6ccfa8254ca76600',
+    'references/contract.md': 'c5a01f00361d5ee9138655c2a5eb28da2a893ffaf727f4b48602883dd121ef89',
     'assets/vendor/viewer-static.min.js': '53a25e8f766e759835a3a6a35d7e88742cb41762ed631ddd6944e38723dade33',
 }
 loader = importlib.util.spec_from_file_location('presentation_driver', ROOT / 'scripts/diagram.py')
@@ -130,7 +133,7 @@ const graph=makeGraph(malicious);theme.configure(malicious.spec);theme.apply(gra
 for(const c of Object.values(graph.model.cells).filter(c=>c.vertex)){
  const label=graph.convertValueToString(c);
  if(graph.isHtmlLabel(c)){ok(!label.includes('<img'),'untrusted label not executable HTML');ok(label.includes('&lt;img'),'label angle brackets escaped');ok(label.includes('&amp;'),'label ampersand escaped');ok(label.includes('&quot;'),'double quote escaped');ok(label.includes('&#39;'),'single quote escaped');}
- else eq(label,payload,'native text preserves raw label safely');
+ else eq(label.replace(/\n/g,''),payload,'native text preserves every raw label character safely; wrapping is display-only');
 }
 console.log(JSON.stringify({ok:true,checks,fixtures:reports,evidence:'headless actual theme on native-model doubles; no browser geometry or screenshot claim'}));
 '''
@@ -151,7 +154,7 @@ function setup(spec){let sequence=0,callbacks=new Map();const elements=Object.cr
  const element=id=>elements[id]||(elements[id]=domElement());
  const graph={model:{getCell:id=>cells[id],getParent:c=>c&&cells[c.parent]},container:{classList:{toggle(){},remove(){}}},view:{scale:.43,translate:{x:41,y:73}}};
  const detailImpl={setScope(){},paint(){},fit(){}};const sim=new Simulation(spec),sandbox={sim,spec,graph,detailImpl,document:{createElement:()=>domElement()},console:{error(){}},$:element,text(id,v){element(id).textContent=v},label:id=>cells[id].label,metadata:c=>c,showContract(){},setTimeout(fn){callbacks.set(++sequence,fn);return sequence},clearTimeout(id){callbacks.delete(id)}};
- vm.createContext(sandbox);vm.runInContext("let timer=null,autoRunning=false,autoGeneration=0,runError=null,presentation=null;let detail=detailImpl,detailSession=null,detailScope=null,detailLiveKey=null,detailManualScope=null,detailManualOwner=null,detailError=null;function render(){syncDetail()}\n"+extract('haltTimer','fieldsList')+extract('within','focusClass')+extract('areaScope','setupDetail')+extract('renderNarrative','visibleCell')+"this.state=()=>({timer,autoRunning,autoGeneration,runError,detailSession,detailScope,detailManualScope});",sandbox);
+ vm.createContext(sandbox);vm.runInContext("let timer=null,autoRunning=false,autoGeneration=0,runError=null,presentation=null;let detail=detailImpl,detailSession=null,detailScope=null,detailLiveKey=null,detailManualScope=null,detailManualOwner=null,detailError=null;function render(){syncDetail()}\n"+extract('haltTimer','fieldsList')+extract('waitView','render')+extract('within','focusClass')+extract('areaScope','setupDetail')+extract('renderNarrative','visibleCell')+"this.state=()=>({timer,autoRunning,autoGeneration,runError,detailSession,detailScope,detailManualScope});",sandbox);
  return{sim,sandbox,graph,callbacks,elements,tick(){const e=callbacks.entries().next().value;if(!e)return false;callbacks.delete(e[0]);e[1]();return true}};
 }
 function narrative(h){const before=core(h);h.sandbox.renderNarrative(h.sim.run);eq(core(h),before,'narration preserves runtime, history, timer and camera');eq(h.elements['narrative-title'].textContent,h.sim.nodes.get(h.sim.run.nodeId).label.replace(/\n/g,' '),'narration uses real current node');eq(h.elements['narrative-reason'].textContent,h.sim.run.reason||h.sim.nodes.get(h.sim.run.nodeId).docs.goal,'narration uses actual reason');}
@@ -185,7 +188,7 @@ class PresentationTests(unittest.TestCase):
         for path, expected in BASELINE_HASHES.items():
             with self.subTest(path=path):
                 self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), expected,
-                                 'Presentation-only work must not alter execution or vendored engine')
+                                 'Declared build revision and unchanged execution/vendor sources must match the frozen manifest')
 
     def test_02_generic_assets_and_dom_contract(self):
         app = (ROOT / 'assets/app.js').read_text(encoding='utf-8')

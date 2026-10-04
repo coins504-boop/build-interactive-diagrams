@@ -39,8 +39,8 @@ function setup(spec){
  vm.runInContext("let timer=null,autoRunning=false,autoGeneration=0,runError=null,presentation=null;let detail=detailImpl,detailSession=null,detailScope=null,detailLiveKey=null,detailManualScope=null,detailManualOwner=null,detailError=null;\n"+
   // Only the DOM render adapter is a double. Timer/detail and all run button
   // callbacks below are copied at runtime from the actual delivered app.
-  "function render(){const r=sim.run;if(r){$('play').disabled=r.terminal||sim.isWaiting();$('step').disabled=r.terminal||sim.isWaiting();$('back').disabled=!sim.history.length;$('waiting').hidden=!sim.isWaiting();}syncDetail();if(presentation)presentation.sync();}\n"+
-  extract('haltTimer','fieldsList')+extract('within','focusClass')+extract('areaScope','setupDetail')+
+  "function render(){const r=sim.run;if(r){$('play').disabled=r.terminal||sim.isWaiting();$('step').disabled=r.terminal||sim.isWaiting();$('back').disabled=!sim.history.length;$('waiting').hidden=!sim.isWaiting();renderWaitControls(spec.nodes.find(n=>n.id===r.nodeId));}syncDetail();if(presentation)presentation.sync();}\n"+
+  extract('haltTimer','fieldsList')+extract('waitView','render')+extract('within','focusClass')+extract('areaScope','setupDetail')+
   app.slice(app.indexOf(' const start=mode=>safe('),app.indexOf(" $('completion-return').onclick="))+
   app.slice(app.indexOf(' presentation=ProbePresentationControls.create('),app.indexOf('\n',app.indexOf(' presentation=ProbePresentationControls.create(')))+
   "\nthis.panes=presentation;this.state=()=>({timer,autoRunning,autoGeneration,runError,detailSession,detailScope,detailManualScope});",sandbox);
@@ -50,6 +50,7 @@ function setup(spec){
 function core(h){const s=h.sandbox.state();return JSON.stringify({run:h.sim.inspect(),history:h.sim.history,steps:h.sim.stepsUsed,sequence:h.sim.sequence,timer:s.timer,auto:s.autoRunning,generation:s.autoGeneration,timers:[...h.timers.keys()],camera:h.graph.view});}
 const names=['header','toolbar','narrative','inspector','detail'];
 const scenarios=fs.readdirSync(path.join(root,'examples')).filter(n=>n.endsWith('.json')).map(n=>JSON.parse(fs.readFileSync(path.join(root,'examples',n),'utf8')));
+scenarios.push(JSON.parse(fs.readFileSync(path.join(root,'tests/fixtures/wait-intents.json'),'utf8')));
 for(const spec of scenarios){
  const h=setup(spec),originals=['fit','scenario','run-normal','run-failure','run-wait','play','step','back','approve','reject'].map(id=>h.$(id)),handlers=originals.map(e=>e.onclick),parents=originals.map(e=>e.parentNode);
  const initial=core(h);h.panes.set('inspector',false);h.flush();eq(core(h),initial,'idle pane change does not start execution');ok(h.$('play').disabled&&h.$('step').disabled&&h.$('back').disabled,'idle dock cannot run absent session');ok(!h.$('compact-run-dock').hidden,'dock revealed');eq(h.$('scenario').parentNode.id,'compact-run-row','actual scenario selector moves to dock');eq(h.$('waiting').parentNode.id,'compact-wait-slot','actual approval box moves to dock');
@@ -67,7 +68,7 @@ for(const spec of scenarios){
   h.$('scenario').value=test.scenario;h.$('run-'+(test.mode||'normal')).onclick();canonical.start(test.scenario,test.mode||'normal');
   const before=core(h);h.panes.set('inspector',false);h.panes.set('header',false);h.panes.set('toolbar',false);h.panes.set('narrative',false);h.panes.set('detail',false);h.flush();eq(core(h),before,'collapsing live UI leaves active timer and state intact');
   let ticks=0;while(h.tick())ok(++ticks<1001,'bounded autoplay');canonical.advance();eq(h.sim.inspect(),canonical.inspect(),'dock playback matches canonical engine');
-  if(h.sim.isWaiting()){ok(!h.$('waiting').hidden,'same wait box visible in dock');ok(h.$('play').disabled&&h.$('step').disabled,'wait cannot be bypassed by dock controls');const waiting=core(h);h.panes.set('detail',true);h.flush();eq(core(h),waiting,'restoring local view does not approve wait');eq(h.painted().nodeId,h.sim.run.nodeId,'restored detail follows latest live step');}
+  if(h.sim.isWaiting()){const event=spec.nodes.find(n=>n.id===h.sim.run.nodeId).waitPresentation?.intent==='event';eq(h.$('waiting-title').textContent,event?'等待外部事件（本地模拟）':'需要明确决定','dock heading follows active wait intent');eq(h.$('detail-mode').textContent.includes(event?'等待事件':'等待决定'),true,'live detail follows active wait intent');ok(!h.$('waiting').hidden,'same wait box visible in dock');ok(h.$('play').disabled&&h.$('step').disabled,'wait cannot be bypassed by dock controls');const waiting=core(h);h.panes.set('detail',true);h.flush();eq(core(h),waiting,'restoring local view does not approve wait');eq(h.painted().nodeId,h.sim.run.nodeId,'restored detail follows latest live step');}
   for(const decision of test.decisions||[]){h.$(decision).onclick();canonical.decide(decision);ticks=0;while(h.tick())ok(++ticks<1001,'bounded decision autoplay');canonical.advance();eq(h.sim.inspect(),canonical.inspect(),'original dock approval/rejection produces canonical result');}
   const final=core(h);h.panes.set('inspector',true);h.panes.set('detail',true);h.flush();eq(core(h),final,'completion preserves camera and runtime when panes return');
  }
