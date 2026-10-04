@@ -132,21 +132,104 @@ def stage(run, name, command, input_path):
     return parsed
 
 
-def expected_projection(raw, report, overview):
+def expected_projection(raw, report, overview, configuration=None):
     # Use the actual prepare contract, not raw/prepared byte equality: generated
     # citations/reports, reserved derived-field removal and overview are legitimate.
     report = copy.deepcopy(report)
     report.pop('preparedSpec', None)
     expected = evidence.project(raw, report)
-    if overview is not None:
+    if configuration is not None:
+        expected['sourcePresentation'] = evidence.presentation_config(raw, configuration)
+    elif overview is not None:
         expected['sourcePresentation'] = evidence.overview_root(raw, overview)
     return expected
+
+
+def presentation_input(path):
+    report = read(path)
+    require(report.get('format') == 'source-presentation-report-v1', 'Expected PRESENTATION_REPORT.json, not a prepared source model or receipt')
+    require(isinstance(report.get('configuration'), (dict, type(None))), 'Invalid presentation report configuration')
+    for key in ('visibleNodeIds', 'visibleExecutionNodeIds', 'criticalNodes'):
+        require(isinstance(report.get(key), list), 'Invalid presentation report ' + key)
+    require(all(isinstance(x, str) for x in report['visibleNodeIds'] + report['visibleExecutionNodeIds']), 'Invalid presentation report node IDs')
+    require(all(isinstance(x, dict) and isinstance(x.get('id'), str) and x.get('visibility') in {'visible', 'hidden'} for x in report['criticalNodes']), 'Invalid presentation report critical nodes')
+    return report
+
+
+def select_presentation(raw, selection):
+    config = raw.get('sourcePresentation')
+    origin = 'model' if config is not None else 'none'
+    inherited = selection.get('inheritedReport')
+    if config is None and inherited is not None:
+        config = inherited['configuration']
+        origin = 'inherited'
+    override = selection.get('override')
+    if override is not None:
+        config = copy.deepcopy(config or {})
+        config.update(evidence.overview_root(raw, override['overviewRoot']) if override['overviewRoot'] is not None else {'overviewRoot': None, 'projection': 'No overview promotion; original hierarchy displayed'})
+        origin = 'cli'
+    if config is not None:
+        config = evidence.presentation_config(raw, config)
+    return config, origin
+
+
+def presentation_report(spec, origin, baseline=None):
+    """Initial model visibility: same projection + nested-container fold policy as app.boot.
+
+    The native model parity test checks this policy; no fonts, pixels, zoom, label
+    collisions or browser interaction are inspected by this structural report.
+    """
+    config = spec.get('sourcePresentation')
+    root = config.get('overviewRoot') if config else None
+    nodes = {n['id']: n for n in spec['nodes']}
+    parents = {n['id']: None if n.get('parent') == root and root else n.get('parent') for n in spec['nodes']}
+    folded = {ident for ident, n in nodes.items() if n['role'] == 'container' and parents[ident] and ident != root}
+    rows = []
+    for n in spec['nodes']:
+        ident = n['id']; parent = parents[ident]; chain = []; hidden_by = []
+        if ident == root:
+            hidden_by.append(ident)
+        while parent:
+            chain.append(parent)
+            if parent in folded or parent == root:
+                hidden_by.append(parent)
+            parent = parents[parent]
+        rows.append({'id': ident, 'label': n['label'], 'role': n['role'], 'originalParent': n.get('parent'),
+                     'displayParent': parents[ident], 'displayDepth': len(chain) + 1,
+                     'collapsed': ident in folded, 'visibility': 'hidden' if hidden_by else 'visible', 'hiddenBy': hidden_by})
+    visible = [r['id'] for r in rows if r['visibility'] == 'visible']
+    # A selectable scenario may start at a legal terminal with no control edge.
+    # Match Simulation.start's per-scene entry selection, including fallback.
+    execution = ({spec['entry']} | {s.get('entry', spec['entry']) for s in spec['scenarios']}
+                 | {e[end] for e in spec['edges'] if e.get('kind') != 'data' for end in ('source', 'target')})
+    critical = (config or {}).get('criticalNodeIds', [])
+    result = {'format': 'source-presentation-report-v1', 'configuration': copy.deepcopy(config), 'configurationSource': origin,
+              'evidence': 'Initial native model hierarchy policy, checked against the vendored mxGraph projection/folding in regression tests. No browser pixel/readability verification.',
+              'nodes': rows, 'visibleNodeIds': visible,
+              'visibleExecutionNodeIds': [ident for ident in visible if ident in execution],
+              'criticalNodes': [copy.deepcopy(next(r for r in rows if r['id'] == ident)) for ident in critical],
+              'comparison': None}
+    if baseline is not None:
+        was_visible = baseline['visibleNodeIds']; visible_set = set(visible)
+        key_ids = list(dict.fromkeys(baseline['visibleExecutionNodeIds'] + [n['id'] for n in baseline['criticalNodes'] if n['visibility'] == 'visible']))
+        result['comparison'] = {'configurationChanged': not json_equal(baseline['configuration'], config),
+                                'nodesBecameHidden': [ident for ident in was_visible if ident in nodes and ident not in visible_set],
+                                'nodesRemoved': [ident for ident in was_visible if ident not in nodes],
+                                'keyNodesBecameHidden': [ident for ident in key_ids if ident in nodes and ident not in visible_set],
+                                'keyNodesRemoved': [ident for ident in key_ids if ident not in nodes]}
+    return result
 
 
 def inspected(run, overview):
     raw = read(run / 'source-spec.json')
     prepared_path = run / 'prepared-spec.json'
     prepared = read(prepared_path)
+    selection = read(run / 'PRESENTATION_SELECTION.json')
+    config, origin = select_presentation(raw, selection)
+    require(overview == (config.get('overviewRoot') if config else None), 'Receipt overview root differs from selected presentation')
+    presentation = presentation_report(prepared, origin, selection.get('baselineReport'))
+    require(json_equal(read(run / 'PRESENTATION_REPORT.json'), presentation), 'Presentation report differs from initial model visibility')
+    require(json_equal(read(run / 'PRESENTATION_CONFIG.json'), config), 'Presentation configuration differs from selected input')
     records = {}
     for name in STAGES:
         record = read(run / 'records' / (name + '.json'))
@@ -160,7 +243,7 @@ def inspected(run, overview):
             require(records[name].get('ok') is True, name + ': unsuccessful report')
     checks = records['prepare']['sourceChecks']
     require(checks and all(c['status'] != 'not-checked' for c in checks), 'Every source identity needs a selected --repo root')
-    require(json_equal(prepared, expected_projection(raw, records['prepare'], overview)),
+    require(json_equal(prepared, expected_projection(raw, records['prepare'], overview, config)),
             'Prepared spec differs from current raw-source projection (including summary/nonexecuting mappings)')
     work = run / 'workspace'
     # Inspect the actual files, including the native cells, not just embedded JSON,
@@ -172,6 +255,7 @@ def inspected(run, overview):
         require((work / relative).read_bytes() == native, relative + ': native model/cell mismatch')
     require(json_equal(read(work / 'construction/acceptance.json'), prepared.get('acceptance', [])), 'Acceptance artifact mismatch')
     require((work / 'construction/source-spec.json').read_bytes() == (run / 'source-spec.json').read_bytes(), 'Raw provenance artifact mismatch')
+    require(json_equal(read(work / 'construction/PRESENTATION_CONFIG.json'), {'sourcePresentation': config} if config is not None else {}), 'Construction presentation configuration mismatch')
     verify_handoff(work, prepared, provenance=True)
     for output, source in (('spec.schema.json', 'spec.schema.json'), ('EXECUTION_CONTRACT.md', 'contract.md')):
         require((work / 'construction' / output).read_bytes() == (ROOT / 'references' / source).read_bytes(), 'Construction reference mismatch: ' + output)
@@ -186,7 +270,8 @@ def inspected(run, overview):
     return {'nodes': len(prepared['nodes']), 'edges': len(prepared['edges']),
             'nonexecutingEdgeIds': [e['id'] for e in prepared['edges'] if e.get('kind') == 'data'],
             'coverageRoots': copy.deepcopy(prepared['sourceModel']['coverage']['roots']),
-            'sourceChecks': checks, 'acceptanceCases': len(records['test'])}
+            'sourceChecks': checks, 'acceptanceCases': len(records['test']),
+            'presentation': presentation}
 
 
 def node_index(spec):
@@ -205,7 +290,7 @@ def verify_handoff(work, prepared, provenance=False):
     required = {'blueprint.json', 'diagram.drawio', 'spec.schema.json', 'EXECUTION_CONTRACT.md',
                 'acceptance.json', 'NODE_INDEX.md', 'MANIFEST.json'}
     if provenance:
-        required.update({'source-spec.json', 'SOURCE_PROVENANCE.json'})
+        required.update({'source-spec.json', 'SOURCE_PROVENANCE.json', 'PRESENTATION_CONFIG.json'})
     require(set(tree(handoff)) == required, 'Construction required artifact set mismatch')
     require((handoff / 'NODE_INDEX.md').read_bytes() == node_index(prepared), 'NODE_INDEX does not match prepared model')
     manifest = read(handoff / 'MANIFEST.json')
@@ -221,6 +306,8 @@ def add_provenance(run, source, source_hash):
     handoff = work / 'construction'
     verify_handoff(work, read(run / 'prepared-spec.json'))  # Never rehash and bless a damaged original build handoff.
     (handoff / 'source-spec.json').write_bytes((run / 'source-spec.json').read_bytes())
+    config = read(run / 'PRESENTATION_CONFIG.json')
+    write(handoff / 'PRESENTATION_CONFIG.json', {'sourcePresentation': config} if config is not None else {})
     write(handoff / 'SOURCE_PROVENANCE.json', {
         'sourcePathAtBuild': str(source), 'sourceSha256': source_hash,
         'preparedSha256': sha((run / 'prepared-spec.json').read_bytes()),
@@ -233,7 +320,7 @@ def add_provenance(run, source, source_hash):
                 archive.write(path, 'construction/' + path.relative_to(handoff).as_posix())
 
 
-def build_run(source, out, roots, overview=None):
+def build_run(source, out, roots, overview=None, *, no_overview=False, inherit_presentation=None, presentation_baseline=None):
     source = Path(source).resolve(strict=True)
     roots = {rid: Path(root).resolve(strict=True) for rid, root in roots.items()}
     require(not Path(out).exists() and not Path(out).is_symlink(), 'Output exists; choose a new run directory; no stages ran')
@@ -249,16 +336,29 @@ def build_run(source, out, roots, overview=None):
     (out / 'records').mkdir()
     try:
         (out / 'source-spec.json').write_bytes(raw_bytes)
+        require(not (overview is not None and no_overview), 'Cannot combine overview root and no-overview')
+        selection = {'override': {'overviewRoot': overview} if overview is not None or no_overview else None,
+                     'inheritedReport': presentation_input(inherit_presentation) if inherit_presentation else None,
+                     'baselineReport': presentation_input(presentation_baseline) if presentation_baseline else None}
+        write(out / 'PRESENTATION_SELECTION.json', selection)
+        config, origin = select_presentation(raw, selection)
+        overview = config.get('overviewRoot') if config else None
+        write(out / 'PRESENTATION_CONFIG.json', config)
         snapshot = out / 'source-spec.json'
         prepared = out / 'prepared-spec.json'
         command = python_command('source_evidence.py', 'prepare', snapshot)
         for rid, root in roots.items():
             command += ['--repo', rid + '=' + str(root)]
         command += ['--out', str(prepared)]
-        if overview is not None:
-            command += ['--overview-root', overview]
+        if config is not None:
+            command += ['--presentation-config', str(out / 'PRESENTATION_CONFIG.json')]
         result = stage(out, 'prepare', command, snapshot)
-        require(json_equal(read(prepared), expected_projection(raw, result, overview)), 'Prepared projection mismatch; build was not run')
+        require(json_equal(read(prepared), expected_projection(raw, result, overview, config)), 'Prepared projection mismatch; build was not run')
+        presentation = presentation_report(read(prepared), origin, selection['baselineReport'])
+        write(out / 'PRESENTATION_REPORT.json', presentation)
+        comparison = presentation['comparison']
+        require(not comparison or not (comparison['keyNodesBecameHidden'] or comparison['keyNodesRemoved']),
+                'Presentation baseline lost visible key nodes; inspect PRESENTATION_REPORT.json before selecting an intentional new baseline')
         require(all(c['status'] != 'not-checked' for c in result['sourceChecks']), 'Source checks were not run')
         prepared_hash = sha(prepared.read_bytes())
         for name in ('validate', 'test', 'build'):
@@ -302,7 +402,11 @@ def main():
     build = sub.add_parser('build')
     build.add_argument('source'); build.add_argument('--out', required=True)
     build.add_argument('--repo', action='append', default=[], metavar='ID=PATH')
-    build.add_argument('--overview-root')
+    presentation = build.add_mutually_exclusive_group()
+    presentation.add_argument('--overview-root', help='Override saved model or explicitly inherited presentation root')
+    presentation.add_argument('--no-overview-root', action='store_true', help='Explicitly disable overview projection for this copy')
+    build.add_argument('--presentation-from', help='Explicit previous PRESENTATION_REPORT.json; used only if the raw model has no saved sourcePresentation')
+    build.add_argument('--presentation-baseline', help='Compare initial visibility against a previous PRESENTATION_REPORT.json; fail if visible execution/declared critical nodes disappear')
     verify = sub.add_parser('verify')
     verify.add_argument('run'); verify.add_argument('--source', required=True, help='Current original source model, not a prepared spec')
     args = parser.parse_args()
@@ -315,7 +419,8 @@ def main():
             ident, path = pair.split('=', 1)
             require(ident and path and ident not in roots, 'Duplicate/empty --repo')
             roots[ident] = Path(path).resolve(strict=True)
-        result = build_run(args.source, args.out, roots, args.overview_root)
+        result = build_run(args.source, args.out, roots, args.overview_root, no_overview=args.no_overview_root,
+                           inherit_presentation=args.presentation_from, presentation_baseline=args.presentation_baseline)
     print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
 
 
