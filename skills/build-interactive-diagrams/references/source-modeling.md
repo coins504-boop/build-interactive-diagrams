@@ -10,6 +10,8 @@ Before graph/scenario authoring, preserve a source-derived map:
 
 Inventory requested responsibilities and relevant default/variant behavior using [coverage-review.md](coverage-review.md). A convenient fixture cannot narrow the user's request. Read callees when their defaults, return, errors or effects determine a claim. Inspect the cited ranges for the actual predicate/effect; imports, names and comments alone cannot prove runtime edges.
 
+For an actual-running system, record source presence, active entry/registration and enabled conditions, actual caller, and lifecycle owner for each material responsibility. Keep formal installation and real acceptance evidence as separate scopes, including their version and limits. A helper present only in dormant or legacy code does not become an active path. An implementation may be confirmed while installation, execution effects or long-term quality remain unverified. Use the optional [source workflow](source-workflow.md) to bind these judgments without duplicating the behavior map.
+
 - Detailed: executable decisions/effects mapped to nodes/edges/scenes and claims
 - Summary: meaningful owner/input/output/relationship contract; name abstracted internals
 - Omitted/unknown: reader-visible limitation, never an executable success path
@@ -34,6 +36,10 @@ Before freezing detailed source behavior and after a semantic repair, record app
 4. **State over time:** assert consequential entry/dispatch/effect/observation/cleanup checkpoints as well as terminal. Entry actions run at start; target actions precede a step snapshot; trace IDs are not historical context. Preserve callback-visible captured payload versus live state, delivery timing, internal owner flags and attempt/confirmed counts. Later repair or equal final output cannot prove an earlier checkpoint correct
 5. **Adversarial contrasts:** after repair check neighboring source-valid combinations, earlier return with stale later failure and relevant caller/variant differences. Expectations come from source, exclude the changed input itself when comparing behavior, and distinguish checkpoints rather than only terminal IDs
 6. **Reverse review:** derive expectations from pinned source/request first, then compare both directions with the model and dispositions. Use a separate reviewer when available; preserve its source-only inventory before comparison. If unavailable, perform a separate source-first pass and report that independence remains unverified. Reread exact guards/callers/callees for disagreements and test the nearest counterexample before repairing
+
+For lifecycles spanning turns or callbacks, distinguish the operation's immediate return, durable effects before that return, later automatic use under its own admission rules, and any separate verification of adoption. Read loop-level hooks as well as turn-entry hooks. Retraction of tagged/controlled material does not imply arbitrary chat can be recalled. `tests/lifecycle-contracts.test.js` supplies four synthetic contracts and broken-model controls for these distinctions; it is neither a business policy nor a natural-language classifier.
+
+After a correction, list the changed facts and their affected model/doc/scene pointers. Recheck parent summaries and terminal explanations, which can retain an old claim while the detailed branch is repaired. Preserve exact inspected text and evidence in one change-impact section; the checker can bind that text but cannot decide whether it faithfully explains source.
 
 Read only relevant sections of [source-review-details.md](source-review-details.md) when the modeled source contains reconstruction/ownership changes, async events, callbacks, error-owner propagation or other nontrivial phase interactions. Those details refine applicable gates; they do not require expanding an ordinary diagram into a repository audit. For deliberately broader review or skill changes, see [VALIDATION.md](VALIDATION.md).
 

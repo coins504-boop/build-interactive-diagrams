@@ -67,7 +67,20 @@ def overview_root(spec, ident):
     require(node and node['role'] == 'container' and not node.get('parent'), 'overview-root must be a top-level container')
     require([n['id'] for n in spec['nodes'] if not n.get('parent')] == [ident], 'overview-root must be the sole organizational root')
     require(not any(ident in (e['source'], e['target']) for e in spec['edges']), 'overview-root cannot be a relationship endpoint')
+    require(ident != spec.get('entry') and not node.get('actions'), 'overview-root must be organizational, not an executable entry or action owner')
     return {'overviewRoot': ident, 'projection': 'Promote direct children for display only; original nodes, parents, claims and execution retained in this spec'}
+
+
+def presentation_config(spec, config):
+    """Validate authored display policy independently of derived evidence fields."""
+    require(isinstance(config, dict) and 'overviewRoot' in config, 'sourcePresentation requires an explicit overviewRoot (ID or null)')
+    if config['overviewRoot'] is not None:
+        overview_root(spec, config['overviewRoot'])
+    if 'criticalNodeIds' in config:
+        known = {n['id']: n for n in spec['nodes']}
+        refs(config['criticalNodeIds'], known, 'sourcePresentation.criticalNodeIds')
+        require(len(set(config['criticalNodeIds'])) == len(config['criticalNodeIds']), 'Duplicate sourcePresentation.criticalNodeIds')
+    return copy.deepcopy(config)
 
 
 def snapshot_digest(files):
@@ -163,8 +176,7 @@ def capture_snapshot(root, ident, paths):
 def structural(spec):
     warnings = diagram.validate(spec)
     if 'sourcePresentation' in spec:
-        require(isinstance(spec['sourcePresentation'], dict), 'sourcePresentation must be an object')
-        overview_root(spec, spec['sourcePresentation'].get('overviewRoot'))
+        presentation_config(spec, spec['sourcePresentation'])
     m = spec.get('sourceModel')
     require(isinstance(m, dict) and m.get('version') in {'1.0', '1.1'}, 'sourceModel.version must be 1.0 or 1.1')
     repos = records(m.get('repositories'), 'repositories', True)
@@ -232,10 +244,10 @@ def structural(spec):
         require(area.get('disposition') in {'modeled', 'partial', 'summarized', 'excluded', 'external', 'unknown'} and text(area.get('reason')), 'Coverage area requires disposition and reason')
         refs(area.get('nodeIds', []), nodes, 'coverage.nodeIds (' + area['disposition'] + ' ' + area['repository'] + ':' + area['path'] + ')', area['disposition'] in {'modeled', 'partial', 'summarized'})
     require(isinstance(coverage.get('limitations'), list) and all(text(x) for x in coverage['limitations']), 'coverage.limitations must be an array of explicit caveats')
-    for c in set(claims) - used:
+    for c in sorted(set(claims) - used):
         warnings.append(c + ': claim is not mapped to a diagram node, edge, scenario, or boundary')
     cited = {eid for c in claims.values() for eid in c['evidence']}
-    for e in set(evidence) - cited:
+    for e in sorted(set(evidence) - cited):
         warnings.append(e + ': evidence is not used by any claim')
     # Structural containment + real authored relationships; never invent edges to make this pass.
     adjacency = {ident: set() for ident in nodes}
@@ -480,12 +492,15 @@ def main():
     parser.add_argument('--files', help='JSON array of explicitly selected relative file paths for snapshot capture')
     parser.add_argument('--id', help='Repository identity ID for snapshot capture')
     parser.add_argument('--repo', action='append', default=[], metavar='ID=PATH', help='Explicit local repository root; repeat for multiple repositories')
-    parser.add_argument('--overview-root', help='Display-only organizational root to hide while promoting its children; original spec hierarchy retained')
+    presentation = parser.add_mutually_exclusive_group()
+    presentation.add_argument('--overview-root', help='Override saved sourcePresentation root for display only; original spec hierarchy retained')
+    presentation.add_argument('--no-overview-root', action='store_true', help='Explicitly disable the saved overview projection for this prepared copy')
+    parser.add_argument('--presentation-config', help='Pipeline selected sourcePresentation JSON object; prepare only')
     parser.add_argument('--out', help='New prepared spec path; never overwrites')
     args = parser.parse_args()
     if args.command == 'snapshot':
         require(args.root and args.files and args.id and args.out, 'snapshot requires --root, --files, --id and --out')
-        require(not args.spec and not args.repo and not args.overview_root, 'snapshot does not accept spec, --repo or --overview-root')
+        require(not args.spec and not args.repo and not args.overview_root and not args.no_overview_root and not args.presentation_config, 'snapshot does not accept spec, --repo or presentation options')
         out = Path(args.out).resolve()
         root = Path(args.root).resolve(strict=True)
         require(out != root and not out.is_relative_to(root), 'Snapshot manifest must be written outside selected source root')
@@ -494,6 +509,7 @@ def main():
         print(json.dumps({'ok': True, 'manifest': str(out), 'repository': repository, 'meaning': 'Explicit file identity only; no Git commit, full workspace, or semantic claim verification.'}, ensure_ascii=False, indent=2))
         return
     require(args.spec, 'validate/prepare requires a spec')
+    require(args.command == 'prepare' or not (args.overview_root or args.no_overview_root or args.presentation_config), 'Presentation options require prepare')
     require(not args.root and not args.files and not args.id, 'Snapshot options require the snapshot command')
     roots = {}
     for pair in args.repo:
@@ -508,8 +524,13 @@ def main():
         out = Path(args.out).resolve()
         require(not any(out == Path(root).resolve() or out.is_relative_to(Path(root).resolve()) for root in roots.values()), 'Prepared specs must be written outside selected source roots')
         prepared = project(spec, report)
-        if args.overview_root:
-            prepared['sourcePresentation'] = overview_root(spec, args.overview_root)
+        require(not args.presentation_config or not (args.overview_root or args.no_overview_root), '--presentation-config cannot be combined with root overrides')
+        if args.presentation_config:
+            prepared['sourcePresentation'] = presentation_config(spec, json.loads(Path(args.presentation_config).read_text(encoding='utf-8')))
+        elif args.overview_root or args.no_overview_root:
+            config = copy.deepcopy(spec.get('sourcePresentation', {}))
+            config.update(overview_root(spec, args.overview_root) if args.overview_root else {'overviewRoot': None, 'projection': 'No overview promotion; original hierarchy displayed'})
+            prepared['sourcePresentation'] = presentation_config(spec, config)
         write_new_json(out, prepared)
         report['preparedSpec'] = str(out)
     print(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False))

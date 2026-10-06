@@ -41,6 +41,30 @@ def fixture(summaries=True):
     return spec
 
 
+def presentation_fixture(saved=True):
+    spec = fixture()
+    group = copy.deepcopy(spec['nodes'][0]); group.update(id='area', role='container', parent='project')
+    root = copy.deepcopy(group); root.update(id='project'); root.pop('parent')
+    for node in spec['nodes']:
+        node['parent'] = 'area'
+    spec['nodes'] = [root, group] + spec['nodes']
+    if saved:
+        spec['sourcePresentation'] = {'overviewRoot': 'project', 'criticalNodeIds': ['receive', 'done']}
+    return spec
+
+
+def scenario_entry_fixture():
+    spec = presentation_fixture()
+    alternate = copy.deepcopy(spec['nodes'][2])
+    alternate.update(id='alternate_result', label='Scenario-specific terminal entry', role='terminal')
+    spec['nodes'].append(alternate)
+    spec['edges'].append({'id': 'alternate_data', 'source': 'alternate_result', 'target': 'receive',
+                          'kind': 'data', 'relation': 'data', 'claimIds': ['behavior']})
+    spec['scenarios'].append({'id': 'alternate', 'title': 'Alternate entry', 'entry': 'alternate_result', 'claimIds': ['behavior']})
+    spec['acceptance'].append({'id': 'alternate_case', 'scenario': 'alternate', 'expect': {'status': 'completed', 'nodeId': 'alternate_result'}})
+    return spec
+
+
 class PipelineTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -82,6 +106,204 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(receipt['inspection']['sourceChecks'][0]['status'], 'files-checked-revision-unverified')
         with zipfile.ZipFile(self.out / 'workspace/construction.zip') as z:
             self.assertEqual(z.read('construction/source-spec.json'), self.source.read_bytes())
+
+    def test_saved_presentation_survives_update_without_cli_flag(self):
+        raw = presentation_fixture(); self.save(self.source, raw)
+        receipt = self.build()
+        self.assertEqual(receipt['overviewRoot'], 'project')
+        report = p.read(self.out / 'PRESENTATION_REPORT.json')
+        self.assertEqual(report['configurationSource'], 'model')
+        self.assertEqual(report['visibleNodeIds'], ['area', 'receive', 'done', 'store', 'public_setup', 'extension_summary'])
+        self.assertEqual(report['visibleExecutionNodeIds'], ['receive', 'done'])
+        self.assertEqual(report['criticalNodes'][0]['visibility'], 'visible')
+        prepared = p.read(self.out / 'prepared-spec.json')
+        self.assertEqual([(n['id'], n.get('parent')) for n in prepared['nodes']], [(n['id'], n.get('parent')) for n in raw['nodes']])
+        self.assertEqual(prepared['edges'], raw['edges'])
+        self.assertTrue(p.verify_run(self.out, self.source)['ok'])
+
+    def test_explicit_inheritance_repairs_missing_flag_without_flattening_defaults(self):
+        raw = presentation_fixture(False); self.save(self.source, raw)
+        first = p.build_run(self.source, self.out, {'repo': self.repo}, 'project')
+        self.assertEqual(first['overviewRoot'], 'project')
+        baseline = self.out / 'PRESENTATION_REPORT.json'
+        second = self.root / 'second'
+        p.build_run(self.source, second, {'repo': self.repo}, inherit_presentation=baseline, presentation_baseline=baseline)
+        report = p.read(second / 'PRESENTATION_REPORT.json')
+        self.assertEqual(report['configurationSource'], 'inherited')
+        self.assertFalse(report['comparison']['configurationChanged'])
+        plain = self.root / 'plain'
+        p.build_run(self.source, plain, {'repo': self.repo})
+        self.assertEqual(p.read(plain / 'PRESENTATION_REPORT.json')['visibleNodeIds'], ['project', 'area'])
+
+    def test_optional_baseline_stops_visible_execution_steps_becoming_hidden(self):
+        self.save(self.source, presentation_fixture(False))
+        p.build_run(self.source, self.out, {'repo': self.repo}, 'project')
+        second = self.root / 'regression'
+        with self.assertRaisesRegex(ValueError, 'Presentation baseline lost visible key nodes'):
+            p.build_run(self.source, second, {'repo': self.repo}, presentation_baseline=self.out / 'PRESENTATION_REPORT.json')
+        report = p.read(second / 'PRESENTATION_REPORT.json')
+        self.assertTrue(report['comparison']['configurationChanged'])
+        self.assertEqual(report['comparison']['keyNodesBecameHidden'], ['receive', 'done'])
+        self.assertFalse((second / 'records/validate.json').exists())
+        self.assertFalse((second / 'ARTIFACT_RECEIPT.json').exists())
+
+    def test_cli_override_and_explicit_null_disable_are_preserved(self):
+        self.save(self.source, presentation_fixture())
+        receipt = p.build_run(self.source, self.out, {'repo': self.repo}, no_overview=True)
+        self.assertIsNone(receipt['overviewRoot'])
+        report = p.read(self.out / 'PRESENTATION_REPORT.json')
+        self.assertEqual(report['configurationSource'], 'cli')
+        self.assertIsNone(report['configuration']['overviewRoot'])
+        self.assertEqual(report['configuration']['criticalNodeIds'], ['receive', 'done'])
+        raw = presentation_fixture(); raw['sourcePresentation']['overviewRoot'] = None; self.save(self.source, raw)
+        second = self.root / 'override'
+        receipt = p.build_run(self.source, second, {'repo': self.repo}, 'project')
+        self.assertEqual(receipt['overviewRoot'], 'project')
+        self.assertEqual(p.read(second / 'PRESENTATION_REPORT.json')['configurationSource'], 'cli')
+
+    def test_bad_presentation_root_and_unknown_critical_ids_fail_closed(self):
+        for change in ({'overviewRoot': 'missing'}, {'overviewRoot': 'area'}, {'overviewRoot': 'project', 'criticalNodeIds': ['missing']}):
+            raw = presentation_fixture(); raw['sourcePresentation'] = change; self.save(self.source, raw)
+            with self.assertRaises(ValueError):
+                p.build_run(self.source, self.root / ('invalid-' + str(len(json.dumps(change)))), {'repo': self.repo})
+        raw = presentation_fixture(False); self.save(self.source, raw)
+        with self.assertRaisesRegex(ValueError, 'top-level container'):
+            p.build_run(self.source, self.out, {'repo': self.repo}, 'area')
+
+    def test_presentation_never_promotes_a_real_execution_boundary(self):
+        for change in ('endpoint', 'entry', 'actions', 'multiple_roots'):
+            raw = presentation_fixture(False)
+            if change == 'endpoint':
+                raw['edges'].append({'id': 'root_data', 'source': 'project', 'target': 'area', 'kind': 'data', 'relation': 'data', 'claimIds': ['behavior']})
+            elif change == 'entry':
+                raw['entry'] = 'project'
+            elif change == 'actions':
+                raw['nodes'][0]['actions'] = [{'set': {'entered': True}}]
+            else:
+                raw['nodes'][-1].pop('parent')
+            self.save(self.source, raw)
+            with self.assertRaisesRegex(ValueError, 'organizational|endpoint|action owner'):
+                p.build_run(self.source, self.root / ('boundary-' + change), {'repo': self.repo}, 'project')
+
+    def test_low_level_prepare_uses_saved_config_and_explicit_disable(self):
+        raw = presentation_fixture(); self.save(self.source, raw)
+        default = self.root / 'default-prepared.json'
+        result = self.command('source_evidence.py', 'prepare', self.source, '--repo', 'repo=' + str(self.repo), '--out', default)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(p.read(default)['sourcePresentation'], raw['sourcePresentation'])
+        disabled = self.root / 'disabled-prepared.json'
+        result = self.command('source_evidence.py', 'prepare', self.source, '--repo', 'repo=' + str(self.repo), '--out', disabled, '--no-overview-root')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIsNone(p.read(disabled)['sourcePresentation']['overviewRoot'])
+
+    def test_explicit_projection_is_compatible_with_schema_and_source_model_11(self):
+        raw = presentation_fixture(); raw['schemaVersion'] = '1.1'; raw['sourceModel']['version'] = '1.1'
+        self.save(self.source, raw)
+        self.assertEqual(self.build()['overviewRoot'], 'project')
+        self.assertTrue(p.verify_run(self.out, self.source)['ok'])
+
+    def test_presentation_baseline_reports_removed_critical_steps(self):
+        baseline = p.presentation_report(presentation_fixture(), 'model')
+        current = presentation_fixture(); current['nodes'] = [n for n in current['nodes'] if n['id'] != 'done']
+        current['sourcePresentation']['criticalNodeIds'] = ['receive']
+        report = p.presentation_report(current, 'model', baseline)
+        self.assertEqual(report['comparison']['keyNodesRemoved'], ['done'])
+
+    def test_scenario_only_entry_becoming_hidden_fails_presentation_baseline(self):
+        raw = scenario_entry_fixture(); self.save(self.source, raw); self.build()
+        baseline = self.out / 'PRESENTATION_REPORT.json'
+        self.assertIn('alternate_result', p.read(baseline)['visibleExecutionNodeIds'])
+        group = copy.deepcopy(raw['nodes'][1]); group.update(id='deep_group', parent='area')
+        raw['nodes'][-1]['parent'] = 'deep_group'; raw['nodes'].append(group)
+        self.save(self.source, raw); second = self.root / 'scene-entry-hidden'
+        with self.assertRaisesRegex(ValueError, 'Presentation baseline lost visible key nodes'):
+            p.build_run(self.source, second, {'repo': self.repo}, presentation_baseline=baseline)
+        report = p.read(second / 'PRESENTATION_REPORT.json')
+        self.assertEqual(report['comparison']['keyNodesBecameHidden'], ['alternate_result'])
+        self.assertFalse((second / 'records/validate.json').exists())
+        self.assertFalse((second / 'ARTIFACT_RECEIPT.json').exists())
+
+    def test_scenario_only_entry_removal_fails_presentation_baseline(self):
+        raw = scenario_entry_fixture(); self.save(self.source, raw); self.build()
+        baseline = self.out / 'PRESENTATION_REPORT.json'
+        raw['nodes'] = [n for n in raw['nodes'] if n['id'] != 'alternate_result']
+        raw['edges'] = [e for e in raw['edges'] if e['id'] != 'alternate_data']
+        raw['scenarios'] = [s for s in raw['scenarios'] if s['id'] != 'alternate']
+        raw['acceptance'] = [a for a in raw['acceptance'] if a['id'] != 'alternate_case']
+        self.save(self.source, raw); second = self.root / 'scene-entry-removed'
+        with self.assertRaisesRegex(ValueError, 'Presentation baseline lost visible key nodes'):
+            p.build_run(self.source, second, {'repo': self.repo}, presentation_baseline=baseline)
+        self.assertEqual(p.read(second / 'PRESENTATION_REPORT.json')['comparison']['keyNodesRemoved'], ['alternate_result'])
+        self.assertFalse((second / 'records/validate.json').exists())
+        self.assertFalse((second / 'ARTIFACT_RECEIPT.json').exists())
+
+    def test_report_matches_actual_native_initial_folding(self):
+        program = r'''
+const fs=require('node:fs'),path=require('node:path');
+const base=process.argv[1],spec=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const r=require(path.join(base,'tests/native-layout-runtime.js')).loadOfficialRuntime();
+r.evaluateFile(path.join(base,'assets/source-presentation.js'));
+const g=r.createGraph(spec),api=r.context.ProbeSourcePresentation;api.projectHierarchy(g,spec);
+const depth=c=>{let d=0;for(;c&&c.id!=='1';c=g.model.getParent(c))d++;return d;};
+const groups=Object.values(g.model.cells).filter(c=>c.vertex&&g.model.isVisible(c)&&c.value.getAttribute('role')==='container');
+for(const c of groups.sort((a,b)=>depth(b)-depth(a)))if(g.model.getParent(c).id!=='1')g.foldCells(true,false,[c]);
+process.stdout.write(JSON.stringify(api.visibilityReport(g,spec)));
+'''
+        for root in ('project', None):
+            raw = scenario_entry_fixture(); raw['sourcePresentation']['overviewRoot'] = root
+            nested = copy.deepcopy(raw['nodes'][1]); nested.update(id='real_group', parent='area')
+            raw['nodes'].insert(2, nested)
+            next(n for n in raw['nodes'] if n['id'] == 'extension_summary')['parent'] = 'real_group'
+            self.save(self.source, raw)
+            expected = p.presentation_report(raw, 'model')['nodes']
+            native = subprocess.run(['node', '-e', program, str(ROOT), str(self.source)], capture_output=True, text=True)
+            self.assertEqual(native.returncode, 0, native.stderr)
+            self.assertEqual(json.loads(native.stdout), expected)
+            # Native API reports state rows only, with no separate execution-ID
+            # classifier. Derive expected visible scene entries from those real
+            # native flags and contrast with the Python report classification.
+            visible = {n['id'] for n in json.loads(native.stdout) if n['visibility'] == 'visible'}
+            entries = {s.get('entry', raw['entry']) for s in raw['scenarios']}
+            actual_execution = set(p.presentation_report(raw, 'model')['visibleExecutionNodeIds'])
+            self.assertEqual(entries & visible, entries & actual_execution)
+            self.assertEqual('alternate_result' in actual_execution, root is not None)
+
+    def test_raw_model_wins_over_explicit_inherited_configuration(self):
+        self.save(self.source, presentation_fixture())
+        p.build_run(self.source, self.out, {'repo': self.repo})
+        raw = presentation_fixture(); raw['sourcePresentation']['overviewRoot'] = None
+        self.save(self.source, raw); second = self.root / 'model-wins'
+        receipt = p.build_run(self.source, second, {'repo': self.repo}, inherit_presentation=self.out / 'PRESENTATION_REPORT.json')
+        self.assertIsNone(receipt['overviewRoot'])
+        self.assertEqual(p.read(second / 'PRESENTATION_REPORT.json')['configurationSource'], 'model')
+
+    def test_handoff_saves_reusable_cli_configuration_without_changing_raw_bytes(self):
+        raw = presentation_fixture(False); self.save(self.source, raw)
+        before = self.source.read_bytes()
+        p.build_run(self.source, self.out, {'repo': self.repo}, 'project')
+        handoff = p.read(self.out / 'workspace/construction/PRESENTATION_CONFIG.json')
+        self.assertEqual(handoff['sourcePresentation']['overviewRoot'], 'project')
+        self.assertEqual((self.out / 'workspace/construction/source-spec.json').read_bytes(), before)
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertTrue(p.verify_run(self.out, self.source)['ok'])
+
+    def test_presentation_report_and_config_tampering_are_rejected(self):
+        self.save(self.source, presentation_fixture()); self.build()
+        report = p.read(self.out / 'PRESENTATION_REPORT.json'); report['visibleNodeIds'].remove('receive')
+        self.save(self.out / 'PRESENTATION_REPORT.json', report)
+        with self.assertRaisesRegex(ValueError, 'Presentation report differs'):
+            p.inspected(self.out, 'project')
+        with self.assertRaisesRegex(ValueError, 'Artifact/record bytes'):
+            p.verify_run(self.out, self.source)
+
+    def test_presentation_cli_help_and_mutually_exclusive_overrides(self):
+        result = self.command('reconstruction_pipeline.py', 'build', '--help')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for option in ('--presentation-from', '--presentation-baseline', '--no-overview-root'):
+            self.assertIn(option, result.stdout)
+        result = self.command('reconstruction_pipeline.py', 'build', self.source, '--out', self.out, '--overview-root', 'project', '--no-overview-root')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.out.exists())
 
     def test_legacy_output_exists_then_old_build_hazard_and_new_wrapper_refuses(self):
         old = self.root / 'old.json'; self.save(old, fixture(False))
