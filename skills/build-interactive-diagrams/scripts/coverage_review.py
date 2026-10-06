@@ -5,6 +5,7 @@ Standard library only. Does not modify the model, execute it, or read source cod
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -88,7 +89,53 @@ def pointer(document, path):
     return value
 
 
-def check(record, baseline, spec, baseline_digest, spec_digest):
+def load_discovery(path, repo_roots):
+    loader = importlib.util.spec_from_file_location('coverage_discovery', Path(__file__).with_name('source_discovery.py'))
+    module = importlib.util.module_from_spec(loader); loader.loader.exec_module(module)
+    report, digest = read(path)
+    module.verify(report, repo_roots)
+    return report, digest
+
+
+def discovery_check(record, baseline, current, spec, source_scan, source_scan_digest):
+    binding = baseline['discovery'].get('source_scan_sha256')
+    if binding is None:
+        require(source_scan is None and 'source_scan_sha256' not in record['discovery'],
+                'Discovery adoption requires a new frozen baseline with source_scan_sha256')
+        return {'status': 'not-checked', 'unresolved_ids': [], 'limits': 'Legacy inventory has no source-enumerated denominator'}, []
+    require(isinstance(binding, str) and re.fullmatch(r'[0-9a-f]{64}', binding), 'Invalid source_scan_sha256')
+    require(source_scan is not None and source_scan_digest == binding == record['discovery'].get('source_scan_sha256'), 'Missing or stale bound discovery scan')
+    require(source_scan['source_identity'] == baseline.get('source_identity') == record.get('source_identity'), 'Discovery source identity mismatch')
+    require(source_scan['source_identity'] == spec.get('sourceModel', {}).get('repositories'), 'Discovery differs from model source identity')
+    reconciliation = obj(record.get('source_reconciliation'), 'source_reconciliation')
+    unresolved, excluded = [], []
+    for name in ('candidates', 'relations'):
+        expected = {row['id'] for row in source_scan[name]}
+        values = array(reconciliation.get(name), 'source_reconciliation.' + name)
+        rows = indexed(values, name) if values else {}
+        require(set(rows) == expected, name + ' reconciliation must account for every source-discovered ID exactly once')
+        for ident, row in rows.items():
+            disposition = row.get('disposition')
+            require(disposition in ('mapped', 'excluded', 'unresolved'), ident + ': invalid discovery disposition')
+            words(row.get('explanation'), ident + '.explanation')
+            texts(row.get('source_refs'), ident + '.source_refs', True)
+            items = texts(row.get('item_ids'), ident + '.item_ids')
+            require(len(items) == len(set(items)) and set(items) <= set(current), ident + ': unknown/duplicate inventory item')
+            if disposition == 'mapped':
+                require(items, ident + ': mapped discovery needs inventory item IDs')
+            elif disposition == 'excluded':
+                require(row.get('scope_basis') in ('outside-request', 'user-narrowed'), ident + ': exclusion needs scope_basis')
+                words(row.get('scope_evidence'), ident + '.scope_evidence')
+                excluded.append(ident)
+            else:
+                unresolved.append(ident)
+    blockers = ['Source discovery remains unresolved: ' + ', '.join(unresolved)] if unresolved else []
+    return {'status': 'reconciled_per_record' if not blockers else 'incomplete', 'unresolved_ids': unresolved,
+            'excluded_ids': excluded, 'candidate_count': len(source_scan['candidates']), 'relation_count': len(source_scan['relations']),
+            'limits': source_scan['limits']}, blockers
+
+
+def check(record, baseline, spec, baseline_digest, spec_digest, source_scan=None, source_scan_digest=None):
     """Return structural validity plus coverage according to explicit human review."""
     old = inventory(baseline)
     current = inventory(record)
@@ -171,7 +218,7 @@ def check(record, baseline, spec, baseline_digest, spec_digest):
             sample_failures.append(path)
     audience_ok = (language == record['request']['explanation_language'] and audience['status'] == 'pass'
                    and surfaces == {'canvas', 'scene', 'inspector', 'narration'} and not sample_failures)
-    blockers = []
+    discovery_result, blockers = discovery_check(record, baseline, current, spec, source_scan, source_scan_digest)
     if independent['basis'] != 'source-first':
         blockers.append('Independent source-first comparison is unverified')
     if record['defaults']['status'] == 'unknown':
@@ -180,7 +227,7 @@ def check(record, baseline, spec, baseline_digest, spec_digest):
         blockers.append('Required coverage remains unmet: ' + ', '.join(unmet))
     if not audience_ok:
         blockers.append('Requested audience/language review is incomplete or failed')
-    return {'structure_status': 'valid',
+    return {'structure_status': 'valid', 'source_discovery': discovery_result,
             'requested_coverage_status': 'incomplete' if blockers else 'complete_per_record',
             'unmet_item_ids': unmet, 'user_narrowed_item_ids': narrowed,
             'audience_status': 'pass_per_record' if audience_ok else 'incomplete',
@@ -207,13 +254,23 @@ def main(argv=None):
     parser.add_argument('record')
     parser.add_argument('--baseline', required=True, help='Preserved pregraph inventory JSON')
     parser.add_argument('--spec', required=True, help='Exact raw or prepared spec reviewed')
+    parser.add_argument('--discovery', help='Frozen source-discovery JSON; re-derived from --repo before checking')
+    parser.add_argument('--repo', action='append', default=[], metavar='ID=PATH')
     parser.add_argument('--require-complete', action='store_true', help='Exit 2 when record still reports unmet work')
     args = parser.parse_args(argv)
     try:
         record, _ = read(args.record)
         baseline, baseline_digest = read(args.baseline)
         spec, spec_digest = read(args.spec)
-        report = check(record, baseline, spec, baseline_digest, spec_digest)
+        roots = {}
+        for pair in args.repo:
+            require('=' in pair, '--repo must be ID=PATH')
+            key, value = pair.split('=', 1)
+            require(key not in roots and value, 'Duplicate/empty --repo')
+            roots[key] = value
+        require(args.discovery or not roots, '--repo requires --discovery')
+        source_scan, source_scan_digest = load_discovery(args.discovery, roots) if args.discovery else (None, None)
+        report = check(record, baseline, spec, baseline_digest, spec_digest, source_scan, source_scan_digest)
     except (ValueError, TypeError, KeyError, OSError) as error:
         print(json.dumps({'structure_status': 'invalid', 'error': str(error)}, ensure_ascii=False, indent=2))
         return 1

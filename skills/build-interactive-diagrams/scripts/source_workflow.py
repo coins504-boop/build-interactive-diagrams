@@ -235,7 +235,7 @@ def changes_check(record, path, spec):
     return adequate
 
 
-def finalize(workflow, run, source, coverage_path=None, comparison_path=None, browser_path=None, changes_path=None, update=False):
+def finalize(workflow, run, source, coverage_path=None, comparison_path=None, browser_path=None, changes_path=None, update=False, discovery_path=None, repo_roots=None):
     baseline, baseline_hash, inventory_hash = frozen(workflow)
     spec, spec_hash = read(source)
     inventory_receipt, _ = read(Path(workflow) / 'INVENTORY_FREEZE.json')
@@ -256,7 +256,10 @@ def finalize(workflow, run, source, coverage_path=None, comparison_path=None, br
     if coverage_path:
         record, digest = read(coverage_path)
         require(pipeline.json_equal(record.get('source_identity'), baseline['source_identity']), 'Coverage record source identity mismatch')
-        report = coverage.check(record, baseline, spec, baseline_hash, spec_hash)
+        source_scan, source_scan_digest = coverage.load_discovery(discovery_path, repo_roots or {}) if discovery_path else (None, None)
+        report = coverage.check(record, baseline, spec, baseline_hash, spec_hash, source_scan, source_scan_digest)
+        if source_scan_digest:
+            bound['source_discovery_sha256'] = source_scan_digest
         final_items = coverage.inventory(record)
         bound['coverage_sha256'] = digest
         blockers += report['blockers']
@@ -307,6 +310,8 @@ def main(argv=None):
     final.add_argument('run'); final.add_argument('--source', required=True); final.add_argument('--workflow', required=True)
     for name in ('coverage', 'comparison', 'browser', 'changes'):
         final.add_argument('--' + name)
+    final.add_argument('--discovery')
+    final.add_argument('--repo', action='append', default=[], metavar='ID=PATH')
     final.add_argument('--update', action='store_true'); final.add_argument('--out', required=True)
     final.add_argument('--require-complete', action='store_true')
     args = parser.parse_args(argv)
@@ -319,7 +324,15 @@ def main(argv=None):
             out = Path(args.out).resolve()
             require(not out.is_relative_to(Path(args.run).resolve()), 'Final review must be outside the receipted artifact run')
             require(not out.is_relative_to(ROOT), 'Review output must be outside the skill')
-            result = finalize(args.workflow, args.run, args.source, args.coverage, args.comparison, args.browser, args.changes, args.update)
+            roots = {}
+            for pair in args.repo:
+                require('=' in pair, '--repo must be ID=PATH')
+                key, value = pair.split('=', 1)
+                require(key not in roots and value, 'Duplicate/empty --repo')
+                roots[key] = value
+            require(args.discovery or not roots, '--repo requires --discovery')
+            require(not args.discovery or args.coverage, '--discovery requires --coverage')
+            result = finalize(args.workflow, args.run, args.source, args.coverage, args.comparison, args.browser, args.changes, args.update, args.discovery, roots)
             write(out, result)
         print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
         return 2 if args.command == 'finalize' and args.require_complete and result['delivery_status'] != 'complete_per_record' else 0

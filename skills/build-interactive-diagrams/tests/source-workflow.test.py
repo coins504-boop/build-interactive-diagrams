@@ -115,6 +115,54 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(any(message in text for text in report['blockers']), report)
         return report
 
+    def adopt_discovery(self):
+        discovery = load('workflow_discovery_test', ROOT / 'scripts/source_discovery.py')
+        scan = discovery.scan([self.identity], {'repo': self.repo})
+        path = self.base / 'discovery.json'; self.save(path, scan)
+        self.baseline['discovery']['source_scan_sha256'] = m.pipeline.sha(path.read_bytes())
+        self.save(self.inventory_path, self.baseline)
+        self.workflow = self.base / 'discovery-workflow'
+        m.freeze_inventory(self.inventory_path, self.request, self.workflow)
+        m.freeze_spec(self.workflow, self.source)
+        self.coverage['discovery'] = copy.deepcopy(self.baseline['discovery'])
+        self.coverage['baseline_sha256'] = m.pipeline.sha(self.inventory_path.read_bytes())
+        self.coverage['source_reconciliation'] = {name: [
+            {'id': row['id'], 'disposition': 'mapped', 'item_ids': ['receive'],
+             'explanation': 'Fixture full-file reading', 'source_refs': ['main.txt:1-2']} for row in scan[name]]
+            for name in ('candidates', 'relations')}
+        self.save(self.source_only, self.baseline)
+        self.comparison['source_only_inventory'] = self.ref(self.source_only)
+        return path, scan
+
+    def test_discovery_adoption_finalization_binds_and_propagates_unresolved(self):
+        path, scan = self.adopt_discovery()
+        report = self.finalize(discovery_path=path, repo_roots={'repo': self.repo})
+        self.assertEqual(report['delivery_status'], 'complete_per_record')
+        self.assertEqual(report['bindings']['source_discovery_sha256'], m.pipeline.sha(path.read_bytes()))
+        self.coverage['source_reconciliation']['candidates'][0]['disposition'] = 'unresolved'
+        report = self.finalize(discovery_path=path, repo_roots={'repo': self.repo})
+        self.assertEqual(report['delivery_status'], 'provisional')
+        self.assertTrue(any('discovery remains unresolved' in b for b in report['blockers']))
+
+    def test_discovery_finalization_requires_roots_scan_and_exact_regeneration(self):
+        path, scan = self.adopt_discovery()
+        with self.assertRaisesRegex(ValueError, 'Missing or stale'): self.finalize()
+        with self.assertRaisesRegex(ValueError, 'exactly one --repo'): self.finalize(discovery_path=path)
+        scan['candidates'] = []; self.save(path, scan)
+        with self.assertRaisesRegex(ValueError, 'fresh identity-bound'):
+            self.finalize(discovery_path=path, repo_roots={'repo': self.repo})
+
+    def test_discovery_finalization_cli_accepts_verified_binding(self):
+        path, _ = self.adopt_discovery()
+        self.finalize(discovery_path=path, repo_roots={'repo': self.repo})
+        args = [sys.executable, '-I', '-S', str(ROOT / 'scripts/source_workflow.py'), 'finalize', str(self.artifact_run),
+                '--workflow', str(self.workflow), '--source', str(self.source), '--discovery', str(path),
+                '--repo', 'repo=' + str(self.repo), '--out', str(self.base / 'final.json'), '--require-complete']
+        for key, value in self.paths.items(): args += ['--' + key, str(value)]
+        result = subprocess.run(args, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)['coverage_result']['source_discovery']['status'], 'reconciled_per_record')
+
     def test_complete_is_explicit_per_record_not_proof(self):
         report = self.finalize()
         self.assertEqual(report['delivery_status'], 'complete_per_record')

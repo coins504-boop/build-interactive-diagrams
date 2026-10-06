@@ -4,6 +4,8 @@ Use this thin helper for source reconstruction when a preserved source-first inv
 
 ## Freeze source-first inputs before the model
 
+For new work, first generate the [source-discovery scan](source-discovery.md), bind its digest in `discovery.source_scan_sha256`, and reconcile every file/relation in the final coverage record. Pass `--discovery /project/source-discovery.json --repo repo=/authorized/source` to `finalize` for fresh source verification; repeat `--repo` for multiple identities. Existing unbound workflows remain compatible but explicitly lack this discovery layer.
+
 Preserve the exact original request in a text file. Create the compact inventory from actual entry/configuration/caller/lifecycle reading **before graph and scene expectations**. Use the inventory shape in [coverage-review.md](coverage-review.md), adding `source_identity` (the exact array to use as `sourceModel.repositories`). Full Git pins or [explicit local snapshots](local-source-snapshot.md) are accepted; copied snapshots still cover only their declared files.
 
 For each substantive `kind: "responsibility"` item, add the following `runtime` assessment. Defaults and variants need not duplicate this table. These are source-review assertions, never facts inferred from a function name or installation directory:

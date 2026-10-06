@@ -1,6 +1,6 @@
 # Coverage and audience record
 
-For source reconstruction only. Keep this compact record beside the behavior map/spec; it tracks claims and omissions, not a second audit. It cannot discover source or prove semantic sufficiency.
+For source reconstruction only. Keep this compact record beside the behavior map/spec; it tracks claims and omissions, not a second audit. The record alone cannot discover source or prove semantic sufficiency. For new source work, bind the separate [source-enumerated scan](source-discovery.md) so files omitted by both human lists remain visible.
 
 ## Before graph authoring
 

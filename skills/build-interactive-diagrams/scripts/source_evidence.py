@@ -283,6 +283,42 @@ def git_blob(root, revision, path):
     return result.stdout
 
 
+def identity_entries(repo, root):
+    """Enumerate identity-bound metadata independently of authored coverage roots."""
+    if repo.get('kind') == 'local-snapshot':
+        files = snapshot_manifest(repo)
+        check_snapshot_files(root, repo['snapshot']['files'])
+        return [(path, '100644', item['sha256']) for path, item in files.items()]
+    require(set(repo) == {'id', 'url', 'revision'} and str(repo['url']).startswith('https://'), 'Invalid Git identity')
+    require(isinstance(repo['revision'], str) and REV.fullmatch(repo['revision']), 'Full immutable Git revision required')
+    result = subprocess.run(['git', '--no-replace-objects', '-c', 'core.fsmonitor=false', '-C', str(root),
+                             'ls-tree', '-rz', '--full-tree', repo['revision']], capture_output=True)
+    require(result.returncode == 0, 'Cannot enumerate pinned Git tree')
+    entries = []
+    for entry in result.stdout.split(b'\0'):
+        if not entry:
+            continue
+        header, raw_path = entry.split(b'\t', 1)
+        mode, kind, sha = header.decode('ascii').split()
+        path = raw_path.decode('utf-8')
+        path_ok(path)
+        entries.append((path, mode, sha))
+    return sorted(entries)
+
+
+def identity_files(repo, root, entries=None):
+    """Yield one file's bytes at a time, retaining complete-byte identity checks."""
+    entries = identity_entries(repo, root) if entries is None else entries
+    files = snapshot_manifest(repo) if repo.get('kind') == 'local-snapshot' else None
+    for path, mode, sha in entries:
+        if files is not None:
+            data, _ = read_snapshot_file(root, path)
+            require(len(data) == files[path]['size'] and hashlib.sha256(data).hexdigest() == files[path]['sha256'], 'Snapshot changed before discovery read: ' + path)
+        else:
+            data = sha.encode('ascii') if mode == '160000' else git_blob(root, repo['revision'], path)
+        yield path, mode, data
+
+
 def relationship_graph(spec):
     """Undirected authored-edge connectivity only, never execution reachability."""
     adjacency = {}
